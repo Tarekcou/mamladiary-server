@@ -21,9 +21,10 @@ app.get("/", (req, res) => {
 connectToDB().then(() => {
   const casesCollection = getDB().collection("cases");
   const userCollection = getDB().collection("users");
+  const adcMamlaCollection = getDB().collection("adcmamla");
 
   // Now that DB is connected, define your DB-dependent route
-  app.get("/cases", async (req, res) => {
+  app.get("/allMamla", async (req, res) => {
     try {
       const result = await casesCollection.find().toArray();
       res.send(result);
@@ -32,16 +33,28 @@ connectToDB().then(() => {
       res.status(500).send({ error: "Failed to fetch cases" });
     }
   });
+  app.get("/adcMamla", async (req, res) => {
+    try {
+      const result = await adcMamlaCollection.find().toArray();
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to fetch cases:", error.message);
+      res.status(500).send({ error: "Failed to fetch cases" });
+    }
+  });
   app.get("/mamlas", async (req, res) => {
-    const { mamlaNo, district, mamlaName, mamlaYear } = req.query;
+    const { mamlaNo, district, mamlaName, year } = req.query;
     // Combine all into a single filter object
+
     const query = {
       mamlaNo,
-      mamlaYear,
+      year,
+      district,
+      mamlaName,
     };
-
     try {
       const caseDoc = await casesCollection.findOne(query);
+      console.log(caseDoc);
       if (!caseDoc) {
         return res.status(404).send({ error: "Case not found" });
       }
@@ -52,8 +65,30 @@ connectToDB().then(() => {
       res.status(500).send({ error: "Internal server error" });
     }
   });
+  app.post("/mamlas", async (req, res) => {
+    const mamla = req.body;
+    // console.log(mamla);
+    try {
+      const result = await casesCollection.insertOne(mamla);
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to insert case:", error.message);
+      res.status(500).send({ error: "Failed to insert case" });
+    }
+  });
+  app.post("/adcMamla", async (req, res) => {
+    const mamla = req.body;
+    // console.log(mamla);
+    try {
+      const result = await adcMamlaCollection.insertOne(mamla);
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to insert case:", error.message);
+      res.status(500).send({ error: "Failed to insert case" });
+    }
+  });
 
-  app.post("/users", async (req, res) => {
+  app.post("/register", async (req, res) => {
     const user = req.body;
     // console.log(user);
     const query = { email: user.email };
@@ -64,15 +99,22 @@ connectToDB().then(() => {
     const result = await userCollection.insertOne(user);
     res.send(result);
   });
-  app.get("/users", async (req, res) => {
-    const user = req.query;
-    // console.log(user);
+  app.post("/login", async (req, res) => {
+    const { email, dnothiId, password } = req.body;
     const query = {
-      email: user?.email || user?.dnothiId,
-      password: user?.password,
+      $or: [{ email }, { dnothiId }],
+      password, // Note: hash passwords in production!
     };
-    const result = await userCollection.findOne(query);
-    res.send(result);
+    // console.log(query);
+    const user = await userCollection.findOne(query);
+
+    if (!user) {
+      return res
+        .status(401)
+        .send({ status: "error", message: "Invalid credentials" });
+    }
+
+    res.send({ status: "success", user });
   });
 
   app.listen(port, () => {

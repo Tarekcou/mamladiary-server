@@ -5,7 +5,7 @@ const { connectToDB, getDB } = require("./db");
 async function importJsonData() {
   try {
     // Step 1: Read the JSON file
-    const jsonData = fs.readFileSync("data.json", "utf-8");
+    const jsonData = fs.readFileSync("adc.json", "utf-8");
     const data = JSON.parse(jsonData);
 
     if (!Array.isArray(data) || data.length === 0) {
@@ -16,7 +16,7 @@ async function importJsonData() {
     // Step 2: Connect to MongoDB
     await connectToDB();
     const db = getDB();
-    const collection = db.collection("cases");
+    const collection = db.collection("adcmamla");
 
     // Step 3: Insert into MongoDB
     const result = await collection.insertMany(data);
