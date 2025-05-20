@@ -20,7 +20,7 @@ app.get("/", (req, res) => {
 });
 
 connectToDB().then(() => {
-  const casesCollection = getDB().collection("cases");
+  const casesCollection = getDB().collection("mamla");
   const userCollection = getDB().collection("users");
   const adcMamlaCollection = getDB().collection("adcmamla");
 
@@ -45,7 +45,7 @@ connectToDB().then(() => {
     } catch (error) {
       console.error("Error finding case:", error);
       // res.status(500).send({ error: "Internal server error" });
-      res.send(error)
+      res.send(error);
     }
   });
   app.get("/allMamla", async (req, res) => {
