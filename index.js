@@ -37,15 +37,16 @@ connectToDB().then(() => {
       district,
       mamlaName,
     };
+    console.log(query)
     try {
       const caseDoc = await casesCollection.findOne(query);
       // console.log(caseDoc);
-      // console.log("Found case:", caseDoc);
+      console.log("Found case:", caseDoc);
       res.send(caseDoc);
     } catch (error) {
       console.error("Error finding case:", error);
       // res.status(500).send({ error: "Internal server error" });
-      res.send(error);
+      res.send(error)
     }
   });
   app.get("/allMamla", async (req, res) => {
