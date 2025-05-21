@@ -23,6 +23,8 @@ connectToDB().then(() => {
   const casesCollection = getDB().collection("mamla");
   const userCollection = getDB().collection("users");
   const adcMamlaCollection = getDB().collection("adcmamla");
+  const complainCollection = getDB().collection("complains");
+  const feedbackCollection = getDB().collection("feedbacks");
 
   // Now that DB is connected, define your DB-dependent route
 
@@ -37,16 +39,16 @@ connectToDB().then(() => {
       district,
       mamlaName,
     };
-    console.log(query)
+    // console.log(query)
     try {
       const caseDoc = await casesCollection.findOne(query);
       // console.log(caseDoc);
-      console.log("Found case:", caseDoc);
+      // console.log("Found case:", caseDoc);
       res.send(caseDoc);
     } catch (error) {
       console.error("Error finding case:", error);
       // res.status(500).send({ error: "Internal server error" });
-      res.send(error)
+      res.send(error);
     }
   });
   app.get("/allMamla", async (req, res) => {
@@ -58,6 +60,48 @@ connectToDB().then(() => {
       res.status(500).send({ error: "Failed to fetch cases" });
     }
   });
+  app.get("/allMamla/:date", async (req, res) => {
+    const date = req.params.date;
+    console.log(date);
+    try {
+      const query = { nextDate: date };
+      const result = await casesCollection
+        .find(query)
+        .sort({ _id: -1 })
+        .toArray();
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to fetch cases:", error.message);
+      res.status(500).send({ error: "Failed to fetch cases" });
+    }
+  });
+  app.get("/monthlyReport", async (req, res) => {
+    const { month, year } = req.query;
+    if (!month || !year) {
+      return res.status(400).json({ error: "Month and year required" });
+    }
+    // Construct dates for MongoDB query
+    const startDate = new Date(`${year}-${month}-01`);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
+    // console.log(startDate, endDate);
+    try {
+      const cases = await casesCollection
+        .find({
+          createdAt: {
+            $gte: startDate.toISOString().split("T")[0],
+            $lt: endDate.toISOString().split("T")[0],
+          },
+        })
+        .toArray();
+      // console.log(cases);
+      res.status(200).json(cases);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
   app.get("/adcMamla", async (req, res) => {
     try {
       const result = await adcMamlaCollection
@@ -216,6 +260,88 @@ connectToDB().then(() => {
     const updateDoc = { $set: { role: role } };
     const result = await userCollection.updateOne(query, updateDoc);
     res.send(result);
+  });
+
+  // side panel
+  app.post("/complains", async (req, res) => {
+    const complain = req.body;
+    console.log(complain);
+    try {
+      const result = await complainCollection.insertOne(complain);
+      console.log("Inserted complain:", result);
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to insert complain:", error.message);
+      res.status(500).send({ error: "Failed to insert complain" });
+    }
+  });
+  app.get("/complains", async (req, res) => {
+    try {
+      const result = await complainCollection
+        .find()
+        .sort({ _id: -1 })
+        .toArray();
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to fetch cases:", error.message);
+      res.status(500).send({ error: "Failed to fetch cases" });
+    }
+  });
+  app.delete("/complains/:id", async (req, res) => {
+    const complainId = req.params.id;
+    console.log("Deleting complain with ID:", complainId);
+
+    try {
+      const result = await complainCollection.deleteOne({
+        _id: new ObjectId(complainId),
+      });
+
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to delete complain:", error.message);
+      res.status(500).send({ error: "Failed to delete complain" });
+    }
+  });
+
+  // feedback
+  app.post("/feedbacks", async (req, res) => {
+    const complain = req.body;
+    console.log(complain);
+    try {
+      const result = await feedbackCollection.insertOne(complain);
+      console.log("Inserted complain:", result);
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to insert complain:", error.message);
+      res.status(500).send({ error: "Failed to insert complain" });
+    }
+  });
+  app.get("/feedbacks", async (req, res) => {
+    try {
+      const result = await feedbackCollection
+        .find()
+        .sort({ _id: -1 })
+        .toArray();
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to fetch cases:", error.message);
+      res.status(500).send({ error: "Failed to fetch cases" });
+    }
+  });
+  app.delete("/feedbacks/:id", async (req, res) => {
+    const feedbackId = req.params.id;
+    console.log("Deleting feedback with ID:", feedbackId);
+
+    try {
+      const result = await feedbackCollection.deleteOne({
+        _id: new ObjectId(feedbackId),
+      });
+
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to delete complain:", error.message);
+      res.status(500).send({ error: "Failed to delete complain" });
+    }
   });
 
   app.listen(port, () => {
