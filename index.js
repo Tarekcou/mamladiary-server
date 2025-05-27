@@ -86,15 +86,14 @@ connectToDB().then(() => {
     endDate.setMonth(endDate.getMonth() + 1);
     // console.log(startDate, endDate);
     try {
-      const cases = await casesCollection
-        .find({
-          createdAt: {
-            $gte: startDate.toISOString().split("T")[0],
-            $lt: endDate.toISOString().split("T")[0],
-          },
-        })
-        .toArray();
-      // console.log(cases);
+      const query = {
+        completedMamla: { $regex: "নিষ্পত্তি", $options: "i" },
+        completionDate: {
+          $gte: startDate.toISOString().split("T")[0],
+          $lt: endDate.toISOString().split("T")[0],
+        },
+      };
+      const cases = await casesCollection.find(query).toArray();
       res.status(200).json(cases);
     } catch (err) {
       console.error(err);
