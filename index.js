@@ -75,25 +75,39 @@ connectToDB().then(() => {
       res.status(500).send({ error: "Failed to fetch cases" });
     }
   });
-  app.get("/monthlyReport", async (req, res) => {
+
+  // Report
+  app.get("/report", async (req, res) => {
     const { month, year } = req.query;
-    if (!month || !year) {
-      return res.status(400).json({ error: "Month and year required" });
-    }
-    // Construct dates for MongoDB query
-    const startDate = new Date(`${year}-${month}-01`);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 1);
-    // console.log(startDate, endDate);
+
     try {
-      const query = {
+      let query = {
         completedMamla: { $regex: "নিষ্পত্তি", $options: "i" },
-        completionDate: {
+      };
+
+      if (month && year) {
+        const startDate = new Date(`${year}-${month}-01`);
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + 1);
+
+        query.completionDate = {
           $gte: startDate.toISOString().split("T")[0],
           $lt: endDate.toISOString().split("T")[0],
-        },
-      };
+        };
+      } else if (year) {
+        const startDate = new Date(`${year}-01-01`);
+        const endDate = new Date(startDate);
+        endDate.setFullYear(endDate.getFullYear() + 1); // 2025 + 1 = 2026
+        query.completionDate = {
+          $gte: startDate.toISOString().split("T")[0],
+          $lt: endDate.toISOString().split("T")[0],
+        };
+      }
+
+      console.log("Query:", query);
+
       const cases = await casesCollection.find(query).toArray();
+      // console.log(cases)
       res.status(200).json(cases);
     } catch (err) {
       console.error(err);
@@ -192,7 +206,7 @@ connectToDB().then(() => {
   });
   app.post("/adcMamla", async (req, res) => {
     const mamla = req.body;
-    console.log(mamla);
+    // console.log(mamla);
     try {
       const result = await adcMamlaCollection.insertOne(mamla);
       console.log("Inserted ADC Mamla:", result);
