@@ -4,6 +4,8 @@ const dotenv = require("dotenv");
 const caseRoutes = require("./routes/cases.js");
 const { connectToDB, getDB } = require("./db.js");
 const { ObjectId } = require("mongodb"); // ✅ Import ObjectId
+const smsRoutes = require("./routes/smsRoutes");
+const { sendSMSHandler } = require("./infobip/controllers/smsController");
 
 dotenv.config();
 
@@ -14,6 +16,9 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/cases", caseRoutes);
+app.use("/routes/smsRoutes", smsRoutes);
+
+app.post("/message", sendSMSHandler); // POST /api/sms/send
 
 app.get("/", (req, res) => {
   res.send("MamlaDiary API is running");
