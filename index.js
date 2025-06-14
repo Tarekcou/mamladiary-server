@@ -19,24 +19,24 @@ app.use(express.json());
 app.use("/api/cases", caseRoutes);
 app.use("/routes/smsRoutes", smsRoutes);
 
-app.post("/message", sendSMSHandler); // POST /api/sms/send
+// app.post("/message", sendSMSHandler); // POST /api/sms/send
 
 // FOr BULSMS BD
-// app.post("/message", async (req, res) => {
-//   const { to, message } = req.body;
-//   if (!to || !message) {
-//     return res
-//       .status(400)
-//       .json({ error: "Recipient number and message are required." });
-//   }
+app.post("/message", async (req, res) => {
+  const { to, message } = req.body;
+  if (!to || !message) {
+    return res
+      .status(400)
+      .json({ error: "Recipient number and message are required." });
+  }
 
-//   try {
-//     const result = await sendBulkSMS(to, message);
-//     res.status(200).json({ success: true, result });
-//   } catch (err) {
-//     res.status(500).json({ success: false, error: err.message });
-//   }
-// });
+  try {
+    const result = await sendBulkSMS(to, message);
+    res.status(200).json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 app.get("/", (req, res) => {
   res.send("MamlaDiary API is running");

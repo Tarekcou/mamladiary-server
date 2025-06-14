@@ -9,6 +9,7 @@ const sendBulkSMS = async (to, message) => {
   payload.append("senderid", process.env.BULKSMSBD_SENDER_ID);
   payload.append("number", to); // support comma-separated for bulk
   payload.append("message", message);
+  // console.log(payload.toString());
 
   try {
     const response = await axios.post(url, payload.toString(), {
