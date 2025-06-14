@@ -127,7 +127,7 @@ connectToDB().then(() => {
         };
       }
 
-      console.log("Query:", query);
+      // console.log("Query:", query);
 
       const cases = await casesCollection.find(query).toArray();
       // console.log(cases)
@@ -153,7 +153,7 @@ connectToDB().then(() => {
   app.patch("/mamla/:id", async (req, res) => {
     const mamlaId = req.params.id;
     const updatedData = req.body;
-    console.log("Updated data:", updatedData, mamlaId);
+    // console.log("Updated data:", updatedData, mamlaId);
     const query = { _id: new ObjectId(mamlaId) };
     const updateDoc = { $set: updatedData };
     try {
@@ -272,9 +272,9 @@ connectToDB().then(() => {
     const result = await userCollection.find().toArray();
     res.send(result);
   });
-  app.get("/users/:email", async (req, res) => {
-    const email = req.params.email;
-    const query = { email: email };
+  app.get("/users/:dnothiId", async (req, res) => {
+    const dnothiId = req.params.dnothiId;
+    const query = { dnothiId };
     const result = await userCollection.findOne(query);
 
     res.send(result);
@@ -289,19 +289,32 @@ connectToDB().then(() => {
 
   // Make admin or agent
   app.patch("/users/role/:id", async (req, res) => {
-    const role = req.body.role;
+    const isAdmin = req.body.isAdmin;
     // console.log(role);
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
-    const updateDoc = { $set: { role: role } };
+    const updateDoc = { $set: { isAdmin } };
     const result = await userCollection.updateOne(query, updateDoc);
     res.send(result);
+  });
+  app.patch("/publishUsers/:id", async (req, res) => {
+    const id = req.params.id;
+    const isPublished = req.body.isPublished;
+    const query = { _id: new ObjectId(id) };
+    const updateDoc = { $set: { isPublished } };
+    try {
+      const result = await userCollection.updateOne(query, updateDoc);
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Failed to update user:", error.message);
+      res.status(500).send({ error: "Failed to update user" });
+    }
   });
 
   // side panel
   app.post("/complains", async (req, res) => {
     const complain = req.body;
-    console.log(complain);
+    // console.log(complain);
     try {
       const result = await complainCollection.insertOne(complain);
       console.log("Inserted complain:", result);
@@ -342,7 +355,7 @@ connectToDB().then(() => {
   // feedback
   app.post("/feedbacks", async (req, res) => {
     const complain = req.body;
-    console.log(complain);
+    // console.log(complain);
     try {
       const result = await feedbackCollection.insertOne(complain);
       console.log("Inserted complain:", result);
