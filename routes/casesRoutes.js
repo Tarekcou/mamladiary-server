@@ -127,6 +127,41 @@ function casesRoutes(db) {
       res.status(500).send({ message: "Failed to update case" });
     }
   });
+
+  //nagorik info patch
+router.patch("/cases/nagorik/:trackingNo", async (req, res) => {
+  const trackingNo = req.params.trackingNo;
+  const nagorikData = req.body;
+
+  const query = {
+    trackingNo,
+    "caseStages.divCom": { $exists: true },
+  };
+
+  const updateDoc = {
+    $set: {
+      "caseStages.$.divCom.nagorikData": nagorikData,
+    },
+  };
+
+  try {
+    const result = await casesCollection.updateOne(query, updateDoc);
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ message: "No case with divCom stage found", updated: false });
+    }
+
+    if (result.modifiedCount > 0) {
+      return res.send({ message: "Nagorik data added to divCom", updated: true });
+    } else {
+      return res.status(500).send({ message: "Update failed", updated: false });
+    }
+  } catch (error) {
+    console.error("PATCH error:", error);
+    return res.status(500).send({ message: "Server error", error });
+  }
+});
+
   router.get("/cases/:id", async (req, res) => {
     try {
       const id = req.params.id;

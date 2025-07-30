@@ -90,7 +90,7 @@ router.patch("/users/:id", async (req, res) => {
     const id = req.params.id;
     const payload = req.body;
     const query = { _id: new ObjectId(id) };
-
+    
     const updateDoc = {
       $set: payload, // ✅ Use $set to update only the provided fields
     };
