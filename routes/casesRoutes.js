@@ -35,9 +35,13 @@ function casesRoutes(db) {
       fromRole, // user._id of the sender
       fromOfficeName, // officeName.en
       fromDistrict, // district.en
+      id,
+      phone,
+      trackingNo,
     } = req.query;
 
     let query = {};
+    const isApprovedString = req.query.isApproved;
 
     // ✅ SENT CASES (tracked in stageHistory)
     if (fromRole && fromOfficeName && fromDistrict) {
@@ -59,12 +63,30 @@ function casesRoutes(db) {
         "currentStage.officeName.en": officeName,
         "currentStage.district.en": district,
       };
+    } else if (id) {
+      query = {
+        caseStages: {
+          $elemMatch: {
+            "divCom.nagorikData.lawyer.userId": id,
+          },
+        },
+      };
+    } else if (isApprovedString === "true" || isApprovedString === "false") {
+      const isApproved = isApprovedString === "true";
+      query = {
+        caseStages: {
+          $elemMatch: {
+            "divCom.nagorikData.isApproved": isApproved,
+          },
+        },
+      };
     }
 
-    // console.log("MongoDB Query:", JSON.stringify(query, null, 2));
+    console.log("MongoDB Query:", JSON.stringify(query, null, 2));
 
     try {
       const result = await casesCollection.find(query).toArray();
+      // console.log(result);
       res.send(result);
     } catch (error) {
       console.error("Error fetching cases:", error);
@@ -129,38 +151,72 @@ function casesRoutes(db) {
   });
 
   //nagorik info patch
-router.patch("/cases/nagorik/:trackingNo", async (req, res) => {
-  const trackingNo = req.params.trackingNo;
-  const nagorikData = req.body;
+  router.patch("/cases/nagorik/:trackingNo", async (req, res) => {
+    const trackingNo = req.params.trackingNo;
+    const { isApproved, nagorikData } = req.body;
 
-  const query = {
-    trackingNo,
-    "caseStages.divCom": { $exists: true },
-  };
+    try {
+      const existingCase = await casesCollection.findOne({ trackingNo });
 
-  const updateDoc = {
-    $set: {
-      "caseStages.$.divCom.nagorikData": nagorikData,
-    },
-  };
+      if (!existingCase) {
+        return res.status(404).send({ message: "Case not found" });
+      }
 
-  try {
-    const result = await casesCollection.updateOne(query, updateDoc);
+      let updateDoc = {};
 
-    if (result.matchedCount === 0) {
-      return res.status(404).send({ message: "No case with divCom stage found", updated: false });
+      // ✅ CASE 1: Only update isApproved
+      if (isApproved !== undefined) {
+        updateDoc = {
+          $set: {
+            "caseStages.0.divCom.nagorikData.isApproved": isApproved,
+          },
+        };
+      }
+
+      // ✅ CASE 2: Only update nagorikData (replace full object)
+      else if (nagorikData) {
+        const caseStages = existingCase.caseStages || [];
+
+        if (!caseStages[0]) {
+          caseStages.push({ divCom: { nagorikData } });
+        } else if (!caseStages[0].divCom) {
+          caseStages[0].divCom = { nagorikData };
+        } else {
+          caseStages[0].divCom.nagorikData = nagorikData;
+        }
+
+        updateDoc = {
+          $set: {
+            caseStages: caseStages,
+          },
+        };
+      }
+
+      // ❌ CASE 3: Neither present
+      else {
+        return res
+          .status(400)
+          .send({ message: "No valid update data provided" });
+      }
+
+      const result = await casesCollection.updateOne({ trackingNo }, updateDoc);
+
+      if (result.modifiedCount > 0) {
+        return res.send({
+          message: "Update successful",
+          updated: true,
+        });
+      } else {
+        return res.status(500).send({
+          message: "Update failed",
+          updated: false,
+        });
+      }
+    } catch (error) {
+      console.error("PATCH error:", error);
+      return res.status(500).send({ message: "Server error", error });
     }
-
-    if (result.modifiedCount > 0) {
-      return res.send({ message: "Nagorik data added to divCom", updated: true });
-    } else {
-      return res.status(500).send({ message: "Update failed", updated: false });
-    }
-  } catch (error) {
-    console.error("PATCH error:", error);
-    return res.status(500).send({ message: "Server error", error });
-  }
-});
+  });
 
   router.get("/cases/:id", async (req, res) => {
     try {
