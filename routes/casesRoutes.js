@@ -112,17 +112,16 @@ function casesRoutes(db) {
       // ✅ Handle divComReview update
       if (payload.divComReview) {
         for (const [key, val] of Object.entries(payload.divComReview)) {
-          if (key === "orderSheets") {
-            // append to existing orderSheets array
-            updateDoc.$push = {
-              ...(updateDoc.$push || {}),
-              "divComReview.orderSheets": { $each: val },
-            };
-          } else {
+          if (key === "orderSheets" && Array.isArray(val)) {
+            updateFields["divComReview.orderSheets"] = val;
+          }
+          else {
             updateFields[`divComReview.${key}`] = val;
           }
         }
       }
+      
+      
 
       // ✅ Handle responsesFromOffices append
       if (Array.isArray(payload.responsesFromOffices)) {
@@ -158,6 +157,27 @@ function casesRoutes(db) {
     } catch (error) {
       console.error("❌ Error updating case:", error);
       res.status(500).send({ message: "Failed to update case" });
+    }
+  });
+
+  router.patch("/cases/:id/status", async (req, res) => {
+    const { id } = req.params;
+    const { stageKey, status } = req.body;
+  
+    try {
+      const result = await casesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            [`${stageKey}.status`]: status,
+            [`${stageKey}.updatedAt`]: new Date().toISOString(),
+          },
+        }
+      );
+  
+      res.send({ success: result.modifiedCount > 0 });
+    } catch (error) {
+      res.status(500).send({ success: false, error: error.message });
     }
   });
 
