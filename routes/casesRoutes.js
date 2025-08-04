@@ -9,186 +9,157 @@ function casesRoutes(db) {
 
   // POST a new case
   router.post("/cases", async (req, res) => {
-  try {
-    const newCase = req.body;
-    console.log("🔄 Posting new case from Nagorik:", newCase);
-
-    const { trackingNo } = newCase; // ✅ Corrected destructuring
-    const query = { trackingNo };
-
-    const existingCase = await casesCollection.findOne(query);
-    if (existingCase) {
-      return res.status(409).send({ message: "Case already exists", insertedId: null });
-    }
-
-    const result = await casesCollection.insertOne(newCase);
-    res.status(201).send({ message: "Case submitted", insertedId: result.insertedId });
-  } catch (error) {
-    console.error("❌ Error inserting new case:", error);
-    res.status(500).send({ message: "Internal Server Error" });
-  }
-});
-
-  //get the order based on rootCaseId
-  router.get("/cases", async (req, res) => {
-<<<<<<< HEAD
-  const {
-    role,
-    officeName,
-    district,
-    fromRole, // user._id of the sender
-    fromOfficeName, // officeName.en
-    fromDistrict, // district.en
-    submittedBy,  // ✅ NEW: user._id of the submitter (Nagorik)
-  } = req.query;
-
-  let query = {};
-=======
-    const {
-      role,
-      officeName,
-      district,
-      fromRole, // user._id of the sender
-      fromOfficeName, // officeName.en
-      fromDistrict, // district.en
-      id,
-      phone,
-      trackingNo,
-    } = req.query;
-
-    let query = {};
-    const isApprovedString = req.query.isApproved;
->>>>>>> eea874e9c636a76392535e18a1bf18d9b077f863
-
-  // ✅ My Submitted Cases (Nagorik)
-  if (submittedBy) {
-    query = {
-      "submittedBy.id": submittedBy,
-    };
-  }
-
-  // ✅ SENT CASES (tracked in stageHistory)
-  else if (fromRole && fromOfficeName && fromDistrict) {
-    query = {
-      stageHistory: {
-        $elemMatch: {
-          "sentBy.userId": fromRole,
-          "sentBy.officeName.en": fromOfficeName,
-          "sentBy.district.en": fromDistrict,
-        },
-      },
-    };
-  }
-
-  // ✅ INBOX CASES (received by current office)
-  else if (role && officeName && district) {
-    query = {
-      "currentStage.stage": role,
-      "currentStage.officeName.en": officeName,
-      "currentStage.district.en": district,
-    };
-  }
-
-  try {
-    const result = await casesCollection.find(query).toArray();
-    res.send(result);
-  } catch (error) {
-    console.error("Error fetching cases:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-});
-
-
-  router.patch("/cases/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const payload = req.body;
-    delete payload?._id;
-
-    const query = { _id: new ObjectId(id) };
-    const updateFields = {};
-
-    // ✅ 1. Update nagorikSubmission-related fields (if provided)
-    if (payload.trackingNo) updateFields.trackingNo = payload.trackingNo;
-    if (typeof payload.isApproved === "boolean") updateFields.isApproved = payload.isApproved;
-    if (payload.submittedBy) updateFields.submittedBy = payload.submittedBy;
-    if (payload.nagorikSubmission) updateFields.nagorikSubmission = payload.nagorikSubmission;
-
-    // ✅ 2. If sent from office panel - also support caseStages logic
-    if (Array.isArray(payload.caseStages) && payload.caseStages[0]) {
-      updateFields["caseStages.0"] = payload.caseStages[0];
-    }
-
-    if (payload.currentStage) {
-      updateFields.currentStage = payload.currentStage;
-    }
-
-    const updateDoc = { $set: updateFields };
-
-    if (Array.isArray(payload.stageHistory)) {
-      updateDoc.$push = {
-        stageHistory: {
-          $each: payload.stageHistory.slice(-1), // Only push latest
-        },
-      };
-    }
-
-<<<<<<< HEAD
-    if (
-      Object.keys(updateDoc.$set).length === 0 &&
-      !updateDoc.$push?.stageHistory
-    ) {
-      return res.status(400).json({ message: "No valid update data." });
-    }
-
-    const result = await casesCollection.updateOne(query, updateDoc);
-    res.send(result);
-
-  } catch (error) {
-    console.error("❌ Error updating case:", error);
-    res.status(500).send({ message: "Failed to update case" });
-  }
-});
-=======
-    // ✅ INBOX CASES (received by current office)
-    else if (role && officeName && district) {
-      query = {
-        "currentStage.stage": role,
-        "currentStage.officeName.en": officeName,
-        "currentStage.district.en": district,
-      };
-    } else if (id) {
-      query = {
-        caseStages: {
-          $elemMatch: {
-            "divCom.nagorikData.lawyer.userId": id,
-          },
-        },
-      };
-    } else if (isApprovedString === "true" || isApprovedString === "false") {
-      const isApproved = isApprovedString === "true";
-      query = {
-        caseStages: {
-          $elemMatch: {
-            "divCom.nagorikData.isApproved": isApproved,
-          },
-        },
-      };
-    }
-
-    console.log("MongoDB Query:", JSON.stringify(query, null, 2));
-
     try {
-      const result = await casesCollection.find(query).toArray();
-      // console.log(result);
-      res.send(result);
+      const newCase = req.body;
+      console.log("🔄 Posting new case from Nagorik:", newCase);
+
+      const { trackingNo } = newCase; // ✅ Corrected destructuring
+      const query = { trackingNo };
+
+      const existingCase = await casesCollection.findOne(query);
+      if (existingCase) {
+        return res
+          .status(409)
+          .send({ message: "Case already exists", insertedId: null });
+      }
+
+      const result = await casesCollection.insertOne(newCase);
+      res
+        .status(201)
+        .send({ message: "Case submitted", insertedId: result.insertedId });
     } catch (error) {
-      console.error("Error fetching cases:", error);
-      res.status(500).send({ error: "Internal Server Error" });
+      console.error("❌ Error inserting new case:", error);
+      res.status(500).send({ message: "Internal Server Error" });
     }
   });
->>>>>>> eea874e9c636a76392535e18a1bf18d9b077f863
 
+  //get the order based on rootCaseId
+
+  router.get("/cases", async (req, res) => {
+    const { role, officeName, district, userId, isApproved } = req.query;
+
+    const filter = {};
+
+    try {
+      if (role === "divCom") {
+        // 🔍 Show all cases that were sent from anyone to any office
+        filter["nagorikSubmission"] = { $exists: true };
+
+        if (isApproved !== undefined) {
+          filter.isApproved = isApproved === true;
+        }
+      } else if (role === "lawyer" || role === "nagorik") {
+        if (!userId) {
+          return res
+            .status(400)
+            .json({ message: "Missing userId for filtering." });
+        }
+        filter["submittedBy.id"] = userId;
+      } else if (role === "acLand" || role === "adc") {
+        filter["messagesToOffices"] = {
+          $elemMatch: {
+            "sentTo.role": role,
+            "sentTo.officeName.en": officeName,
+            "sentTo.district.en": district,
+          },
+        };
+      } else if (role === "acLand" || role === "adc") {
+        filter["responsesFromOffices"] = {
+          $elemMatch: {
+            role: role,
+            "officeName.en": officeName,
+            "district.en": district,
+          },
+        };
+      }
+
+      console.log("FILTER:", filter);
+
+      const cases = await casesCollection
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.json(cases);
+    } catch (error) {
+      console.error("GET /cases failed:", error.message);
+      res.status(500).json({ message: "Server error", error: error.message });
+    }
+  });
+
+  router.patch("/cases/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const payload = req.body;
+      delete payload?._id;
+
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {};
+      const updateFields = {};
+
+      // ✅ Basic flat field updates
+      if (payload.trackingNo) updateFields.trackingNo = payload.trackingNo;
+      if (typeof payload.isApproved === "boolean")
+        updateFields.isApproved = payload.isApproved;
+      if (payload.submittedBy) updateFields.submittedBy = payload.submittedBy;
+
+      // ✅ Flatten nagorikSubmission
+      if (payload.nagorikSubmission) {
+        for (const [key, val] of Object.entries(payload.nagorikSubmission)) {
+          updateFields[`nagorikSubmission.${key}`] = val;
+        }
+      }
+
+      // ✅ Handle divComReview update
+      if (payload.divComReview) {
+        for (const [key, val] of Object.entries(payload.divComReview)) {
+          if (key === "orderSheets") {
+            // append to existing orderSheets array
+            updateDoc.$push = {
+              ...(updateDoc.$push || {}),
+              "divComReview.orderSheets": { $each: val },
+            };
+          } else {
+            updateFields[`divComReview.${key}`] = val;
+          }
+        }
+      }
+
+      // ✅ Handle responsesFromOffices append
+      if (Array.isArray(payload.responsesFromOffices)) {
+        updateDoc.$push = {
+          ...(updateDoc.$push || {}),
+          responsesFromOffices: { $each: payload.responsesFromOffices },
+        };
+      }
+
+      // ✅ Messages to Offices push (if sent)
+      if (Array.isArray(payload.messagesToOffices)) {
+        updateDoc.$push = {
+          ...(updateDoc.$push || {}),
+          messagesToOffices: { $each: payload.messagesToOffices },
+        };
+      }
+
+      // ✅ Set $set if any flat field updates exist
+      if (Object.keys(updateFields).length > 0) {
+        updateDoc.$set = updateFields;
+      }
+
+      // ❌ If no valid update
+      if (Object.keys(updateDoc).length === 0) {
+        return res
+          .status(400)
+          .json({ message: "No valid update fields found." });
+      }
+
+      // 🔄 Perform update
+      const result = await casesCollection.updateOne(query, updateDoc);
+      res.send(result);
+    } catch (error) {
+      console.error("❌ Error updating case:", error);
+      res.status(500).send({ message: "Failed to update case" });
+    }
+  });
 
   //nagorik info patch
   router.patch("/cases/nagorik/:trackingNo", async (req, res) => {
@@ -261,6 +232,7 @@ function casesRoutes(db) {
   router.get("/cases/:id", async (req, res) => {
     try {
       const id = req.params.id;
+      console.log(id);
       const caseData = await casesCollection.findOne({ _id: new ObjectId(id) });
 
       if (!caseData) {

@@ -10,7 +10,6 @@ const port = process.env.PORT || 5500;
 app.use(cors());
 app.use(express.json());
 
-
 // app.post("/message", sendSMSHandler); // POST /api/sms/send
 
 // FOr BULSMS BD
@@ -41,7 +40,7 @@ app.get("/", (req, res) => {
 connectToDB().then(() => {
   const db = getDB(); // ✅ safe to use here
 
- // Import and use routes with db injected
+  // Import and use routes with db injected
   const mamlaRoutes = require("./routes/mamlaRoutes")(db);
   const divComUserRoutes = require("./routes/divComUserRoutes")(db);
   const usersRoutes = require("./routes/usersRoutes")(db);
@@ -52,17 +51,18 @@ connectToDB().then(() => {
   const complainRoutes = require("./routes/complainRoutes")(db);
   const feedbackRoutes = require("./routes/feedbackRoutes")(db);
   const smsRoutes = require("./routes/smsRoutes");
-
+  const whatsappRoutes = require("./routes/whatsappRoutes")(db);
   app.use("/api", mamlaRoutes);
   app.use("/api", usersRoutes);
   app.use("/api", divComUserRoutes);
   app.use("/api", adcMamlaRoutes);
 
-  app.use("/api",casesRoutes)
+  app.use("/api", casesRoutes);
   app.use("/api", nagorikUserRoutes);
   app.use("/api", complainRoutes);
   app.use("/api", feedbackRoutes);
   app.use("/api", smsRoutes);
+  app.use("/api", whatsappRoutes);
 
   app.listen(port, () => {
     console.log(`✅ Server running at http://localhost:${port}`);
