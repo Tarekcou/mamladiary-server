@@ -36,7 +36,8 @@ function casesRoutes(db) {
   //get the order based on rootCaseId
 
   router.get("/cases", async (req, res) => {
-    const { role, officeName, district, userId, isApproved } = req.query;
+    const { role, officeName, district, userId, isApproved, status } =
+      req.query;
 
     const filter = {};
 
@@ -47,6 +48,9 @@ function casesRoutes(db) {
 
         if (isApproved !== undefined) {
           filter.isApproved = isApproved === true;
+        }
+        if (status) {
+          filter["nagorikSubmission.status"] = status;
         }
       } else if (role === "lawyer" || role === "nagorik") {
         if (!userId) {
@@ -91,10 +95,12 @@ function casesRoutes(db) {
       const id = req.params.id;
       const payload = req.body;
       delete payload?._id;
+      console.log("🔄 Updating case with ID:", id, "Payload:", payload);
 
       const query = { _id: new ObjectId(id) };
       const updateDoc = {};
       const updateFields = {};
+      const arrayFilters = [];
 
       // ✅ Basic flat field updates
       if (payload.trackingNo) updateFields.trackingNo = payload.trackingNo;
@@ -108,29 +114,6 @@ function casesRoutes(db) {
           updateFields[`nagorikSubmission.${key}`] = val;
         }
       }
-
-      // ✅ Handle divComReview update
-      if (payload.divComReview) {
-        for (const [key, val] of Object.entries(payload.divComReview)) {
-          if (key === "orderSheets" && Array.isArray(val)) {
-            updateFields["divComReview.orderSheets"] = val;
-          }
-          else {
-            updateFields[`divComReview.${key}`] = val;
-          }
-        }
-      }
-      
-      
-
-      // ✅ Handle responsesFromOffices append
-      if (Array.isArray(payload.responsesFromOffices)) {
-        updateDoc.$push = {
-          ...(updateDoc.$push || {}),
-          responsesFromOffices: { $each: payload.responsesFromOffices },
-        };
-      }
-
       // ✅ Messages to Offices push (if sent)
       if (Array.isArray(payload.messagesToOffices)) {
         updateDoc.$push = {
@@ -139,12 +122,102 @@ function casesRoutes(db) {
         };
       }
 
-      // ✅ Set $set if any flat field updates exist
-      if (Object.keys(updateFields).length > 0) {
-        updateDoc.$set = updateFields;
+      // ✅ Handle divComReview update
+      if (payload.divComReview) {
+        for (const [key, val] of Object.entries(payload.divComReview)) {
+          if (key === "orderSheets" && Array.isArray(val)) {
+            updateFields["divComReview.orderSheets"] = val;
+          } else {
+            updateFields[`divComReview.${key}`] = val;
+          }
+        }
       }
 
-      // ❌ If no valid update
+      // ✅ responsesFromOffices handling
+      if (Array.isArray(payload.responsesFromOffices)) {
+        const caseDoc = await casesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        updateDoc.$set = updateDoc.$set || {};
+        updateDoc.$push = updateDoc.$push || {};
+
+        for (const newResponse of payload.responsesFromOffices) {
+          const role = newResponse.role;
+          if (!role) continue;
+
+          const existing = caseDoc.responsesFromOffices?.find(
+            (r) => r.role === role
+          );
+
+          if (existing) {
+            // ✅ Update specific fields inside the matched array element
+            for (const [key, val] of Object.entries(newResponse)) {
+              if (key !== "role") {
+                updateDoc.$set[`responsesFromOffices.$[elem].${key}`] = val;
+              }
+            }
+
+            // Only add array filter if not already added
+            if (!arrayFilters.some((f) => f["elem.role"] === role)) {
+              arrayFilters.push({ "elem.role": role });
+            }
+          } else {
+            // ✅ Push new entry
+            updateDoc.$push.responsesFromOffices = updateDoc.$push
+              .responsesFromOffices || { $each: [] };
+            updateDoc.$push.responsesFromOffices.$each.push(newResponse);
+          }
+        }
+      }
+
+      // ✅ Handle adcCaseData
+      if (payload.adcHeaderData) {
+        const role = "adc";
+        const adcData = payload.adcHeaderData;
+
+        updateDoc.$set = updateDoc.$set || {};
+        updateDoc.$push = updateDoc.$push || {};
+
+        // Fetch the current case to check if role already exists
+        const caseDoc = await casesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        const existing = caseDoc.responsesFromOffices?.find(
+          (r) => r.role === role
+        );
+
+        if (existing) {
+          // ✅ Update fields inside the array element where role === "adc"
+          for (const [key, val] of Object.entries(adcData)) {
+            if (key !== "role") {
+              updateDoc.$set[`responsesFromOffices.$[elem].${key}`] = val;
+            }
+          }
+
+          if (!arrayFilters.some((f) => f["elem.role"] === role)) {
+            arrayFilters.push({ "elem.role": role });
+          }
+        } else {
+          // ✅ Push new object if it doesn't exist
+          updateDoc.$push.responsesFromOffices = updateDoc.$push
+            .responsesFromOffices || { $each: [] };
+          updateDoc.$push.responsesFromOffices.$each.push({
+            role,
+            ...adcData,
+          });
+        }
+      }
+
+      // ✅ Apply flat field updates
+      if (Object.keys(updateFields).length > 0) {
+        updateDoc.$set = {
+          ...(updateDoc.$set || {}),
+          ...updateFields,
+        };
+      }
+
+      // ❌ If no updates were made
       if (Object.keys(updateDoc).length === 0) {
         return res
           .status(400)
@@ -152,18 +225,21 @@ function casesRoutes(db) {
       }
 
       // 🔄 Perform update
-      const result = await casesCollection.updateOne(query, updateDoc);
+      const result = await casesCollection.updateOne(query, updateDoc, {
+        arrayFilters: arrayFilters.length > 0 ? arrayFilters : undefined,
+      });
+
       res.send(result);
     } catch (error) {
       console.error("❌ Error updating case:", error);
-      res.status(500).send({ message: "Failed to update case" });
+      res.status(500).send({ message: "Failed to update case", error });
     }
   });
 
   router.patch("/cases/:id/status", async (req, res) => {
     const { id } = req.params;
     const { stageKey, status } = req.body;
-  
+
     try {
       const result = await casesCollection.updateOne(
         { _id: new ObjectId(id) },
@@ -174,9 +250,53 @@ function casesRoutes(db) {
           },
         }
       );
-  
+
       res.send({ success: result.modifiedCount > 0 });
     } catch (error) {
+      res.status(500).send({ success: false, error: error.message });
+    }
+  });
+  // PATCH /cases/:id/send-ack
+  router.patch("/cases/:id/send-divCom", async (req, res) => {
+    const { id } = req.params;
+    const { role, officeName, district } = req.body;
+
+    // Build dynamic arrayFilters based on role
+    let arrayFilters = [];
+
+    if (role === "adc") {
+      arrayFilters = [{ "elem.role": role, "elem.district.en": district }];
+    } else {
+      arrayFilters = [{ "elem.role": role, "elem.officeName.en": officeName }];
+    }
+
+    try {
+      const result = await casesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            "responsesFromOffices.$[elem].sentToDivcom": true,
+            "responsesFromOffices.$[elem].sentDate": new Date(),
+          },
+        },
+        {
+          arrayFilters,
+        }
+      );
+
+      console.log(result);
+
+      if (result.modifiedCount > 0) {
+        console.log("✔️ Modified count:", result.modifiedCount);
+        res.send({ success: true, message: "Acknowledged sent to DivCom" });
+      } else {
+        console.log("❌ Modified count was 0. Result:", result);
+        res
+          .status(404)
+          .send({ success: false, message: "No matching office found" });
+      }
+    } catch (error) {
+      console.error("PATCH /cases/:id/send-divCom failed", error);
       res.status(500).send({ success: false, error: error.message });
     }
   });
@@ -269,6 +389,10 @@ function casesRoutes(db) {
   router.delete("/cases/:id", async (req, res) => {
     try {
       const id = req.params.id;
+      const caseId = req.body?.caseId;
+      console.log(caseId);
+      if (caseId) {
+      }
       const result = await casesCollection.deleteOne({ _id: new ObjectId(id) });
 
       if (result.deletedCount === 0) {
@@ -279,6 +403,48 @@ function casesRoutes(db) {
     } catch (error) {
       console.error("Error deleting case:", error);
       res.status(500).send({ message: "Failed to delete case" });
+    }
+  });
+  //delete particular cases
+  router.patch("/cases/:id/delete-mamla-entry", async (req, res) => {
+    const caseId = req.params.id;
+    const { officeIndex, entryIndex } = req.body;
+
+    try {
+      const caseDoc = await casesCollection.findOne({
+        _id: new ObjectId(caseId),
+      });
+
+      if (!caseDoc) {
+        return res.status(404).send({ message: "Case not found" });
+      }
+
+      const responses = caseDoc.responsesFromOffices || [];
+
+      if (
+        responses[officeIndex] &&
+        responses[officeIndex].mamlaEntries &&
+        responses[officeIndex].mamlaEntries[entryIndex]
+      ) {
+        responses[officeIndex].mamlaEntries.splice(entryIndex, 1);
+
+        // If that office's mamlaEntries becomes empty, optionally remove it too
+        if (responses[officeIndex].mamlaEntries.length === 0) {
+          responses.splice(officeIndex, 1);
+        }
+        console.log(responses);
+        await casesCollection.updateOne(
+          { _id: new ObjectId(caseId) },
+          { $set: { responsesFromOffices: responses } }
+        );
+
+        return res.send({ message: "Mamla entry deleted successfully" });
+      } else {
+        return res.status(400).send({ message: "Invalid index" });
+      }
+    } catch (err) {
+      console.error("Delete Mamla Entry Error:", err);
+      res.status(500).send({ message: "Failed to delete mamla entry" });
     }
   });
 
