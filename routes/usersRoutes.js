@@ -5,78 +5,89 @@ const { ObjectId } = require("mongodb");
 // Get all Feedback
 
 function usersRoutes(db) {
-    const router = express.Router();
+  const router = express.Router();
   const userCollection = db.collection("users");
 
+  router.post("/users", async (req, res) => {
+    const user = req.body;
+    console.log("post click on user post", user);
+    // Normalize phone number
+    if (user.phone && !user.phone.startsWith("+88")) {
+      user.phone = "+88" + user.phone;
+    }
 
-router.post("/users", async (req, res) => {
-  const user = req.body;
-    console.log("post click on user post",user)
-  // Normalize phone number
-  if (user.phone && !user.phone.startsWith('+88')) {
-    user.phone = '+88' + user.phone;
-  }
+    const query = {
+      $or: [{ email: user.email }, { phone: user.phone }],
+    };
 
-  const query = {
-    $or: [
-      { email: user.email },
-      { phone: user.phone }
-    ]
-  };
+    const existingUser = await userCollection.findOne(query);
+    if (existingUser) {
+      return res.send({ message: "user already exists", insertedId: null });
+    }
 
-  const existingUser = await userCollection.findOne(query);
-  if (existingUser) {
-    return res.send({ message: "user already exists", insertedId: null });
-  }
+    const result = await userCollection.insertOne(user);
+    res.send(result);
+  });
 
-  const result = await userCollection.insertOne(user);
-  res.send(result);
-});
+  //login
+  router.post("/users/login", async (req, res) => {
+    const { email, phone, password } = req.body;
+    const loginStatus = req.query.loginStatus;
+    console.log(loginStatus);
 
-//login
-   router.post("/users/login", async (req, res) => {
-  const { email, phone, password } = req.body;
-  const loginStatus=req.query.loginStatus
-  console.log(loginStatus)
+    // Normalize phone by always adding +88 if not present
+    let normalizedPhone = phone;
+    if (phone && !phone.startsWith("+88")) {
+      normalizedPhone = "+88" + phone;
+    }
 
-  // Normalize phone by always adding +88 if not present
-  let normalizedPhone = phone;
-  if (phone && !phone.startsWith("+88")) {
-    normalizedPhone = "+88" + phone;
-  }
+    const query = {
+      password,
+      ...(email ? { email } : phone ? { phone: normalizedPhone } : {}),
+      role: loginStatus,
+    };
+    console.log(query);
 
-  const query = {
-    password,
-    ...(email ? { email } : phone ? { phone: normalizedPhone } : {}),
-    role:loginStatus
-  };
-  console.log(query)
+    const user = await userCollection.findOne(query);
+    console.log(user);
 
-  const user = await userCollection.findOne(query);
-  console.log( user);
+    if (!user) {
+      return res
+        .status(401)
+        .send({ status: "error", message: "ইমেইল/ফোন বা পাসওয়ার্ড সঠিক নয়" });
+    }
 
-  if (!user) {
-    return res.status(401).send({ status: "error", message: "ইমেইল/ফোন বা পাসওয়ার্ড সঠিক নয়" });
-  }
-
-  res.send({ status: "success", user });
-});
+    res.send({ status: "success", user });
+  });
 
   // Get user based on role
   router.get("/users", async (req, res) => {
-  const { role } = req.query; // ✅ Accessing query param
-  // console.log("Role from query:", role);
+    const { role } = req.query; // ✅ Accessing query param
+    // console.log("Role from query:", role);
 
-  const result = await userCollection.find(
-    role ? { role } : {} // Optional: filter only if role is present
-  ).toArray();
+    const result = await userCollection
+      .find(
+        role ? { role } : {} // Optional: filter only if role is present
+      )
+      .toArray();
 
-  res.send(result);
-});
+    res.send(result);
+  });
+  // get specific user based on role, district, officeName
+  router.get("/users/specific-user", async (req, res) => {
+    const { role, district, officeName } = req.query;
 
- 
+    const filter = {};
+    if (role) filter.role = role;
+    if (district) filter["district.en"] = district;
+    if (officeName) filter["officeName.en"] = officeName;
+
+    const result = await userCollection.find(filter).toArray();
+    res.send(result);
+  });
+
   router.delete("/users/:id", async (req, res) => {
-    const id = req.params.id; 
+    const id = req.params.id;
     // console.log(id);
     const query = { _id: new ObjectId(id) };
     const result = await userCollection.deleteOne(query);
@@ -84,25 +95,25 @@ router.post("/users", async (req, res) => {
   });
 
   // Update user
- // Update user
-router.patch("/users/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const payload = req.body;
-    const query = { _id: new ObjectId(id) };
-    
-    const updateDoc = {
-      $set: payload, // ✅ Use $set to update only the provided fields
-    };
+  // Update user
+  router.patch("/users/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const payload = req.body;
+      const query = { _id: new ObjectId(id) };
 
-    const result = await userCollection.updateOne(query, updateDoc);
+      const updateDoc = {
+        $set: payload, // ✅ Use $set to update only the provided fields
+      };
 
-    res.send(result);
-  } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).send({ message: "Failed to update user" });
-  }
-});
+      const result = await userCollection.updateOne(query, updateDoc);
+
+      res.send(result);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).send({ message: "Failed to update user" });
+    }
+  });
 
   router.patch("/divComUser/role/:id", async (req, res) => {
     const isAdmin = req.body.isAdmin;
@@ -126,9 +137,7 @@ router.patch("/users/:id", async (req, res) => {
       res.status(500).send({ error: "Failed to update user" });
     }
   });
-return router
-
+  return router;
 }
 
-
-    module.exports = usersRoutes;
+module.exports = usersRoutes;
