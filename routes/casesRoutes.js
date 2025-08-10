@@ -139,70 +139,83 @@ function casesRoutes(db) {
       }
 
       // 🔹 3. responsesFromOffices handling (caseEntries only)
-      if (
-        Array.isArray(payload.responsesFromOffices) &&
-        payload.responsesFromOffices.length
-      ) {
+      if (Array.isArray(payload.responsesFromOffices)) {
         const newResp = payload.responsesFromOffices[0];
 
-        // If only orderSheets provided
-        if (newResp.orderSheets && !newResp.caseEntries) {
-          updateDoc.$set = {
-            "responsesFromOffices.$[rg].orderSheets": newResp.orderSheets,
-          };
-          arrayFilters.push({
-            "rg.role": newResp.role,
-            "rg.officeName.en": newResp.officeName.en,
-            "rg.district.en": newResp.district.en,
-          });
-        } else {
-          // existing caseEntries logic...
-          const newEntry = newResp.caseEntries[0];
+        const caseDoc = await casesCollection.findOne({
+          _id: new ObjectId(id),
+        });
 
-          const caseDoc = await casesCollection.findOne({
-            _id: new ObjectId(id),
-          });
+        const existing = caseDoc.responsesFromOffices?.find(
+          (r) =>
+            r.role === newResp.role &&
+            r.officeName?.en === newResp.officeName?.en &&
+            r.district?.en === newResp.district?.en
+        );
 
-          const roleGroup = caseDoc.responsesFromOffices?.find(
-            (r) =>
-              r.role === newResp.role &&
-              r.officeName?.en === newResp.officeName?.en &&
-              r.district?.en === newResp.district?.en
-          );
-
-          if (roleGroup) {
-            const existingCaseIndex = roleGroup.caseEntries.findIndex(
-              (e) => e.mamlaNo === newEntry.mamlaNo
+        if (existing) {
+          if (newResp.caseEntries?.length) {
+            // 🔹 CaseEntries update
+            const newCaseEntry = newResp.caseEntries[0];
+            const hasCase = existing.caseEntries?.some(
+              (entry) => entry.mamlaNo === newCaseEntry.mamlaNo
             );
 
-            if (existingCaseIndex >= 0) {
-              // Update the existing caseEntry
+            if (hasCase) {
               updateDoc.$set = {
-                [`responsesFromOffices.$[rg].caseEntries.${existingCaseIndex}`]:
-                  newEntry,
+                ...(updateDoc.$set || {}),
+                "responsesFromOffices.$[elem].caseEntries.$[entry]":
+                  newCaseEntry,
               };
               arrayFilters.push({
-                "rg.role": newResp.role,
-                "rg.officeName.en": newResp.officeName.en,
-                "rg.district.en": newResp.district.en,
+                "elem.role": newResp.role,
+                "elem.officeName.en": newResp.officeName.en,
+                "elem.district.en": newResp.district.en,
+              });
+              arrayFilters.push({
+                "entry.mamlaNo": newCaseEntry.mamlaNo,
               });
             } else {
-              // Push new caseEntry
               updateDoc.$push = {
-                "responsesFromOffices.$[rg].caseEntries": newEntry,
+                ...(updateDoc.$push || {}),
+                "responsesFromOffices.$[elem].caseEntries": {
+                  $each: newResp.caseEntries,
+                },
               };
               arrayFilters.push({
-                "rg.role": newResp.role,
-                "rg.officeName.en": newResp.officeName.en,
-                "rg.district.en": newResp.district.en,
+                "elem.role": newResp.role,
+                "elem.officeName.en": newResp.officeName.en,
+                "elem.district.en": newResp.district.en,
               });
             }
-          } else {
-            // Push whole new role group
-            updateDoc.$push = {
-              responsesFromOffices: newResp,
-            };
+          } else if (newResp.orderSheets?.length) {
+            // 🔹 OrderSheets update (ADC path)
+            if (existing) {
+              updateDoc.$set = {
+                ...(updateDoc.$set || {}),
+                "responsesFromOffices.$[elem].orderSheets": newResp.orderSheets,
+              };
+              arrayFilters.push({
+                "elem.role": newResp.role,
+                "elem.officeName.en":
+                  newResp.officeName?.en ?? existing.officeName?.en,
+                "elem.district.en":
+                  newResp.district?.en ?? existing.district?.en,
+              });
+            } else {
+              // No existing ADC entry — insert new
+              updateDoc.$push = {
+                ...(updateDoc.$push || {}),
+                responsesFromOffices: { $each: [newResp] },
+              };
+            }
           }
+        } else {
+          // Push whole new response object
+          updateDoc.$push = {
+            ...(updateDoc.$push || {}),
+            responsesFromOffices: { $each: payload.responsesFromOffices },
+          };
         }
       }
 
@@ -235,21 +248,6 @@ function casesRoutes(db) {
             .responsesFromOffices || { $each: [] };
           updateDoc.$push.responsesFromOffices.$each.push({ role, ...adcData });
         }
-      }
-
-      // 🔹 Handle orderSheet deletion
-      if (payload.deleteOrderSheet) {
-        const { role, officeName, district, orderSheet } =
-          payload.deleteOrderSheet;
-
-        updateDoc.$pull = {
-          "responsesFromOffices.$[rg].orderSheets": orderSheet,
-        };
-        arrayFilters.push({
-          "rg.role": role,
-          "rg.officeName.en": officeName.en,
-          "rg.district.en": district.en,
-        });
       }
 
       // ❌ No updates

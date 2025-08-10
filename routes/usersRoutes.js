@@ -33,7 +33,7 @@ function usersRoutes(db) {
   router.post("/users/login", async (req, res) => {
     const { email, phone, password } = req.body;
     const loginStatus = req.query.loginStatus;
-    console.log(loginStatus);
+    // console.log(loginStatus);
 
     // Normalize phone by always adding +88 if not present
     let normalizedPhone = phone;
