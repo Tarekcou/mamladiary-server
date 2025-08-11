@@ -91,183 +91,212 @@ function casesRoutes(db) {
   });
 
   router.patch("/cases/:id", async (req, res) => {
-    try {
-      const id = req.params.id;
-      const payload = req.body;
-      delete payload?._id;
+  try {
+    const id = req.params.id;
+    const payload = req.body;
+    delete payload?._id;
 
-      const query = { _id: new ObjectId(id) };
-      const updateDoc = {};
-      const arrayFilters = [];
+    const query = { _id: new ObjectId(id) };
 
-      // 🔹 1. Handle normal flat field updates
-      const flatFields = [
-        "trackingNo",
-        "isApproved",
-        "submittedBy",
-        "nagorikSubmission",
-        "divComReview",
-      ];
+    const caseDoc = await casesCollection.findOne(query);
 
-      flatFields.forEach((field) => {
-        if (payload[field] !== undefined) {
-          if (
-            typeof payload[field] === "object" &&
-            !Array.isArray(payload[field])
-          ) {
-            for (const [key, val] of Object.entries(payload[field])) {
-              updateDoc.$set = {
-                ...(updateDoc.$set || {}),
-                [`${field}.${key}`]: val,
-              };
-            }
-          } else {
-            updateDoc.$set = {
-              ...(updateDoc.$set || {}),
-              [field]: payload[field],
-            };
-          }
-        }
-      });
+    if (!caseDoc) return res.status(404).json({ message: "Case not found" });
 
-      // 🔹 2. messagesToOffices append
-      if (Array.isArray(payload.messagesToOffices)) {
-        updateDoc.$push = {
-          ...(updateDoc.$push || {}),
-          messagesToOffices: { $each: payload.messagesToOffices },
-        };
-      }
+    const updateOps = [];
+    const arrayFilters = [];
 
-      // 🔹 3. responsesFromOffices handling (caseEntries only)
-      if (Array.isArray(payload.responsesFromOffices)) {
-        const newResp = payload.responsesFromOffices[0];
-
-        const caseDoc = await casesCollection.findOne({
-          _id: new ObjectId(id),
-        });
-
-        const existing = caseDoc.responsesFromOffices?.find(
-          (r) =>
-            r.role === newResp.role &&
-            r.officeName?.en === newResp.officeName?.en &&
-            r.district?.en === newResp.district?.en
-        );
-
-        if (existing) {
-          if (newResp.caseEntries?.length) {
-            // 🔹 CaseEntries update
-            const newCaseEntry = newResp.caseEntries[0];
-            const hasCase = existing.caseEntries?.some(
-              (entry) => entry.mamlaNo === newCaseEntry.mamlaNo
-            );
-
-            if (hasCase) {
-              updateDoc.$set = {
-                ...(updateDoc.$set || {}),
-                "responsesFromOffices.$[elem].caseEntries.$[entry]":
-                  newCaseEntry,
-              };
-              arrayFilters.push({
-                "elem.role": newResp.role,
-                "elem.officeName.en": newResp.officeName.en,
-                "elem.district.en": newResp.district.en,
-              });
-              arrayFilters.push({
-                "entry.mamlaNo": newCaseEntry.mamlaNo,
-              });
-            } else {
-              updateDoc.$push = {
-                ...(updateDoc.$push || {}),
-                "responsesFromOffices.$[elem].caseEntries": {
-                  $each: newResp.caseEntries,
-                },
-              };
-              arrayFilters.push({
-                "elem.role": newResp.role,
-                "elem.officeName.en": newResp.officeName.en,
-                "elem.district.en": newResp.district.en,
-              });
-            }
-          } else if (newResp.orderSheets?.length) {
-            // 🔹 OrderSheets update (ADC path)
-            if (existing) {
-              updateDoc.$set = {
-                ...(updateDoc.$set || {}),
-                "responsesFromOffices.$[elem].orderSheets": newResp.orderSheets,
-              };
-              arrayFilters.push({
-                "elem.role": newResp.role,
-                "elem.officeName.en":
-                  newResp.officeName?.en ?? existing.officeName?.en,
-                "elem.district.en":
-                  newResp.district?.en ?? existing.district?.en,
-              });
-            } else {
-              // No existing ADC entry — insert new
-              updateDoc.$push = {
-                ...(updateDoc.$push || {}),
-                responsesFromOffices: { $each: [newResp] },
-              };
-            }
+    // Handle flat fields
+    const flatFields = [
+      "trackingNo",
+      "isApproved",
+      "submittedBy",
+      "nagorikSubmission",
+      "divComReview",
+    ];
+    const flatSet = {};
+    flatFields.forEach((field) => {
+      if (payload[field] !== undefined) {
+        if (typeof payload[field] === "object" && !Array.isArray(payload[field])) {
+          for (const [key, val] of Object.entries(payload[field])) {
+            flatSet[`${field}.${key}`] = val;
           }
         } else {
-          // Push whole new response object
-          updateDoc.$push = {
-            ...(updateDoc.$push || {}),
-            responsesFromOffices: { $each: payload.responsesFromOffices },
-          };
+          flatSet[field] = payload[field];
         }
       }
-
-      // 🔹 4. adcHeaderData
-      if (payload.adcHeaderData) {
-        const role = "adc";
-        const adcData = payload.adcHeaderData;
-
-        updateDoc.$set = updateDoc.$set || {};
-        updateDoc.$push = updateDoc.$push || {};
-
-        const caseDoc = await casesCollection.findOne({
-          _id: new ObjectId(id),
-        });
-        const existing = caseDoc.responsesFromOffices?.find(
-          (r) => r.role === role
-        );
-
-        if (existing) {
-          for (const [key, val] of Object.entries(adcData)) {
-            if (key !== "role") {
-              updateDoc.$set[`responsesFromOffices.$[elem].${key}`] = val;
-            }
-          }
-          if (!arrayFilters.some((f) => f["elem.role"] === role)) {
-            arrayFilters.push({ "elem.role": role });
-          }
-        } else {
-          updateDoc.$push.responsesFromOffices = updateDoc.$push
-            .responsesFromOffices || { $each: [] };
-          updateDoc.$push.responsesFromOffices.$each.push({ role, ...adcData });
-        }
-      }
-
-      // ❌ No updates
-      if (Object.keys(updateDoc).length === 0) {
-        return res
-          .status(400)
-          .json({ message: "No valid update fields found." });
-      }
-
-      // 🔹 Perform update
-      const result = await casesCollection.updateOne(query, updateDoc, {
-        arrayFilters: arrayFilters.length > 0 ? arrayFilters : undefined,
-      });
-
-      res.send(result);
-    } catch (error) {
-      console.error("❌ Error updating case:", error);
-      res.status(500).send({ message: "Failed to update case", error });
+    });
+    if (Object.keys(flatSet).length > 0) {
+      updateOps.push({ $set: flatSet });
     }
-  });
+
+    // Append messagesToOffices
+    if (Array.isArray(payload.messagesToOffices)) {
+      updateOps.push({
+        $push: { messagesToOffices: { $each: payload.messagesToOffices } },
+      });
+    }
+
+    // Handle responsesFromOffices
+    // === Handle responsesFromOffices updates ===
+    if (Array.isArray(payload.responsesFromOffices)) {
+      for (const respUpdate of payload.responsesFromOffices) {
+        // Find matching response in DB by role + officeName.en + district.en
+        const existingResp = caseDoc.responsesFromOffices?.find(
+          (r) =>
+            r.role === respUpdate.role &&
+            r.officeName?.en === respUpdate.officeName?.en &&
+            r.district?.en === respUpdate.district?.en
+        );
+
+        if (!existingResp) {
+          // If no matching response, add whole new response object
+          updateOps.push({
+            $push: { responsesFromOffices: respUpdate },
+          });
+          continue;
+        }
+
+        // === Update caseEntries ===
+        if (respUpdate.caseEntries?.length) {
+          // Updates for existing caseEntries
+          const setOps = {};
+          const arrayFilters = [];
+
+          for (const updatedEntry of respUpdate.caseEntries) {
+            const existingEntry = existingResp.caseEntries?.find(
+              (entry) => entry.mamlaNo === updatedEntry.mamlaNo
+            );
+            if (existingEntry) {
+              // Prepare $set for updated fields except mamlaNo
+              const fieldsToUpdate = { ...updatedEntry };
+              delete fieldsToUpdate.mamlaNo;
+              for (const [key, val] of Object.entries(fieldsToUpdate)) {
+                setOps[
+                  `responsesFromOffices.$[resp].caseEntries.$[entry].${key}`
+                ] = val;
+              }
+
+              // Array filters for matching resp and caseEntry
+              arrayFilters.push({ "resp.role": respUpdate.role });
+              arrayFilters.push({ "resp.officeName.en": respUpdate.officeName.en });
+              arrayFilters.push({ "resp.district.en": respUpdate.district.en });
+              arrayFilters.push({ "entry.mamlaNo": updatedEntry.mamlaNo });
+            }
+          }
+
+          if (Object.keys(setOps).length > 0) {
+            updateOps.push({
+              $set: setOps,
+              arrayFilters,
+            });
+          }
+
+          // Push new caseEntries that don't exist
+          const newEntries = respUpdate.caseEntries.filter(
+            (updatedEntry) =>
+              !existingResp.caseEntries?.some(
+                (entry) => entry.mamlaNo === updatedEntry.mamlaNo
+              )
+          );
+          if (newEntries.length > 0) {
+            updateOps.push({
+              $push: {
+                "responsesFromOffices.$[resp].caseEntries": { $each: newEntries },
+              },
+              arrayFilters: [
+                { "resp.role": respUpdate.role },
+                { "resp.officeName.en": respUpdate.officeName.en },
+                { "resp.district.en": respUpdate.district.en },
+              ],
+            });
+          }
+        }
+
+        // === Update orderSheets ===
+        if (respUpdate.orderSheets?.length) {
+          for (const updatedOrder of respUpdate.orderSheets) {
+            // Update each orderSheet by orderNo
+            const fieldsToUpdate = { ...updatedOrder };
+            delete fieldsToUpdate.orderNo;
+
+            const setOps = {};
+            for (const [key, val] of Object.entries(fieldsToUpdate)) {
+              setOps[
+                `responsesFromOffices.$[resp].orderSheets.$[order].${key}`
+              ] = val;
+            }
+
+            updateOps.push({
+              $set: setOps,
+              arrayFilters: [
+                { "resp.role": respUpdate.role },
+                { "resp.officeName.en": respUpdate.officeName.en },
+                { "resp.district.en": respUpdate.district.en },
+                { "order.orderNo": updatedOrder.orderNo },
+              ],
+            });
+          }
+        }
+      }
+    }
+    // Handle adcHeaderData same as before...
+     // 4️⃣ Handle adcHeaderData
+    if (payload.adcHeaderData) {
+      const role = "adc";
+      const adcData = payload.adcHeaderData;
+
+      updateDoc.$set = updateDoc.$set || {};
+      updateDoc.$push = updateDoc.$push || {};
+
+      const caseDoc = await casesCollection.findOne({ _id: new ObjectId(id) });
+      const existing = caseDoc.responsesFromOffices?.find((r) => r.role === role);
+
+      if (existing) {
+        for (const [key, val] of Object.entries(adcData)) {
+          if (key !== "role") {
+            updateDoc.$set[`responsesFromOffices.$[elem].${key}`] = val;
+          }
+        }
+        if (!arrayFilters.some((f) => f["elem.role"] === role)) {
+          arrayFilters.push({ "elem.role": role });
+        }
+      } else {
+        updateDoc.$push.responsesFromOffices = updateDoc.$push.responsesFromOffices || { $each: [] };
+        updateDoc.$push.responsesFromOffices.$each.push({ role, ...adcData });
+      }
+    }
+
+    // If you already ran separate updateOne operations for responsesFromOffices above,
+    // just apply other updateOps here for flat fields, messagesToOffices etc.
+    if (updateOps.length > 0) {
+      // Merge $set and $push in one update
+      const finalUpdate = updateOps.reduce(
+        (acc, op) => {
+          for (const key in op) {
+            if (!acc[key]) acc[key] = {};
+            Object.assign(acc[key], op[key]);
+          }
+          return acc;
+        },
+        { $set: {}, $push: {} }
+      );
+
+      // Clean empty $set or $push
+      if (Object.keys(finalUpdate.$set).length === 0) delete finalUpdate.$set;
+      if (Object.keys(finalUpdate.$push).length === 0) delete finalUpdate.$push;
+
+      if (Object.keys(finalUpdate).length > 0) {
+        await casesCollection.updateOne(query, finalUpdate);
+      }
+    }
+
+    res.send({ message: "Case updated successfully" });
+  } catch (error) {
+    console.error("❌ Error updating case:", error);
+    res.status(500).send({ message: "Failed to update case", error });
+  }
+});
+
 
   router.patch("/cases/:id/status", async (req, res) => {
     const { id } = req.params;
