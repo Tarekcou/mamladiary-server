@@ -8,87 +8,9 @@ function casesRoutes(db) {
   // GET all cases
 
   // POST a new case
-  router.post("/cases", async (req, res) => {
-    try {
-      const newCase = req.body;
-      console.log("🔄 Posting new case from Nagorik:", newCase);
-
-      const { trackingNo } = newCase; // ✅ Corrected destructuring
-      const query = { trackingNo };
-
-      const existingCase = await casesCollection.findOne(query);
-      if (existingCase) {
-        return res
-          .status(409)
-          .send({ message: "Case already exists", insertedId: null });
-      }
-
-      const result = await casesCollection.insertOne(newCase);
-      res
-        .status(201)
-        .send({ message: "Case submitted", insertedId: result.insertedId });
-    } catch (error) {
-      console.error("❌ Error inserting new case:", error);
-      res.status(500).send({ message: "Internal Server Error" });
-    }
-  });
-
+  
   //get the order based on rootCaseId
 
-  router.get("/cases", async (req, res) => {
-    const { role, officeName, district, userId, isApproved, status } =
-      req.query;
-
-    const filter = {};
-
-    try {
-      if (role === "divCom") {
-        // 🔍 Show all cases that were sent from anyone to any office
-        filter["nagorikSubmission"] = { $exists: true };
-
-        if (isApproved !== undefined) {
-          filter.isApproved = isApproved === true;
-        }
-        if (status) {
-          filter["nagorikSubmission.status"] = status;
-        }
-      } else if (role === "lawyer" || role === "nagorik") {
-        if (!userId) {
-          return res
-            .status(400)
-            .json({ message: "Missing userId for filtering." });
-        }
-        filter["submittedBy.id"] = userId;
-      } else if (role === "acLand" || role === "adc") {
-        filter["messagesToOffices"] = {
-          $elemMatch: {
-            "sentTo.role": role,
-            "sentTo.officeName.en": officeName,
-            "sentTo.district.en": district,
-          },
-        };
-      } else if (role === "acLand" || role === "adc") {
-        filter["responsesFromOffices"] = {
-          $elemMatch: {
-            role: role,
-            "officeName.en": officeName,
-            "district.en": district,
-          },
-        };
-      }
-
-      console.log("FILTER:", filter);
-
-      const cases = await casesCollection
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .toArray();
-      res.json(cases);
-    } catch (error) {
-      console.error("GET /cases failed:", error.message);
-      res.status(500).json({ message: "Server error", error: error.message });
-    }
-  });
 
   router.patch("/cases/:id", async (req, res) => {
     try {
@@ -336,26 +258,7 @@ function casesRoutes(db) {
     }
   });
 
-  router.patch("/cases/:id/status", async (req, res) => {
-    const { id } = req.params;
-    const { stageKey, status } = req.body;
-
-    try {
-      const result = await casesCollection.updateOne(
-        { _id: new ObjectId(id) },
-        {
-          $set: {
-            [`${stageKey}.status`]: status,
-            [`${stageKey}.updatedAt`]: new Date().toISOString(),
-          },
-        }
-      );
-
-      res.send({ success: result.modifiedCount > 0 });
-    } catch (error) {
-      res.status(500).send({ success: false, error: error.message });
-    }
-  });
+  
   // PATCH /cases/:id/send-ack
   router.patch("/cases/:id/send-divCom", async (req, res) => {
     const { id } = req.params;
@@ -402,72 +305,72 @@ function casesRoutes(db) {
   });
 
   //nagorik info patch
-  router.patch("/cases/nagorik/:trackingNo", async (req, res) => {
-    const trackingNo = req.params.trackingNo;
-    const { isApproved, nagorikData } = req.body;
+  // router.patch("/cases/nagorik/:trackingNo", async (req, res) => {
+  //   const trackingNo = req.params.trackingNo;
+  //   const { isApproved, nagorikData } = req.body;
 
-    try {
-      const existingCase = await casesCollection.findOne({ trackingNo });
+  //   try {
+  //     const existingCase = await casesCollection.findOne({ trackingNo });
 
-      if (!existingCase) {
-        return res.status(404).send({ message: "Case not found" });
-      }
+  //     if (!existingCase) {
+  //       return res.status(404).send({ message: "Case not found" });
+  //     }
 
-      let updateDoc = {};
+  //     let updateDoc = {};
 
-      // ✅ CASE 1: Only update isApproved
-      if (isApproved !== undefined) {
-        updateDoc = {
-          $set: {
-            "caseStages.0.divCom.nagorikData.isApproved": isApproved,
-          },
-        };
-      }
+  //     // ✅ CASE 1: Only update isApproved
+  //     if (isApproved !== undefined) {
+  //       updateDoc = {
+  //         $set: {
+  //           "caseStages.0.divCom.nagorikData.isApproved": isApproved,
+  //         },
+  //       };
+  //     }
 
-      // ✅ CASE 2: Only update nagorikData (replace full object)
-      else if (nagorikData) {
-        const caseStages = existingCase.caseStages || [];
+  //     // ✅ CASE 2: Only update nagorikData (replace full object)
+  //     else if (nagorikData) {
+  //       const caseStages = existingCase.caseStages || [];
 
-        if (!caseStages[0]) {
-          caseStages.push({ divCom: { nagorikData } });
-        } else if (!caseStages[0].divCom) {
-          caseStages[0].divCom = { nagorikData };
-        } else {
-          caseStages[0].divCom.nagorikData = nagorikData;
-        }
+  //       if (!caseStages[0]) {
+  //         caseStages.push({ divCom: { nagorikData } });
+  //       } else if (!caseStages[0].divCom) {
+  //         caseStages[0].divCom = { nagorikData };
+  //       } else {
+  //         caseStages[0].divCom.nagorikData = nagorikData;
+  //       }
 
-        updateDoc = {
-          $set: {
-            caseStages: caseStages,
-          },
-        };
-      }
+  //       updateDoc = {
+  //         $set: {
+  //           caseStages: caseStages,
+  //         },
+  //       };
+  //     }
 
-      // ❌ CASE 3: Neither present
-      else {
-        return res
-          .status(400)
-          .send({ message: "No valid update data provided" });
-      }
+  //     // ❌ CASE 3: Neither present
+  //     else {
+  //       return res
+  //         .status(400)
+  //         .send({ message: "No valid update data provided" });
+  //     }
 
-      const result = await casesCollection.updateOne({ trackingNo }, updateDoc);
+  //     const result = await casesCollection.updateOne({ trackingNo }, updateDoc);
 
-      if (result.modifiedCount > 0) {
-        return res.send({
-          message: "Update successful",
-          updated: true,
-        });
-      } else {
-        return res.status(500).send({
-          message: "Update failed",
-          updated: false,
-        });
-      }
-    } catch (error) {
-      console.error("PATCH error:", error);
-      return res.status(500).send({ message: "Server error", error });
-    }
-  });
+  //     if (result.modifiedCount > 0) {
+  //       return res.send({
+  //         message: "Update successful",
+  //         updated: true,
+  //       });
+  //     } else {
+  //       return res.status(500).send({
+  //         message: "Update failed",
+  //         updated: false,
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error("PATCH error:", error);
+  //     return res.status(500).send({ message: "Server error", error });
+  //   }
+  // });
 
   router.get("/cases/:id", async (req, res) => {
     try {
@@ -486,25 +389,7 @@ function casesRoutes(db) {
     }
   });
 
-  router.delete("/cases/:id", async (req, res) => {
-    try {
-      const id = req.params.id;
-      const caseId = req.body?.caseId;
-      console.log(caseId);
-      if (caseId) {
-      }
-      const result = await casesCollection.deleteOne({ _id: new ObjectId(id) });
-
-      if (result.deletedCount === 0) {
-        return res.status(404).send({ message: "Case not found" });
-      }
-
-      res.send({ message: "Case deleted successfully", result });
-    } catch (error) {
-      console.error("Error deleting case:", error);
-      res.status(500).send({ message: "Failed to delete case" });
-    }
-  });
+ 
   //delete particular cases
   router.patch("/cases/:id/delete-mamla-entry", async (req, res) => {
     const caseId = req.params.id;

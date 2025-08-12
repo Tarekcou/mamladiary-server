@@ -47,6 +47,11 @@ connectToDB().then(() => {
   const adcMamlaRoutes = require("./routes/adcMamlaRoutes")(db);
   const nagorikUserRoutes = require("./routes/nagorikUserRoutes")(db);
   const casesRoutes = require("./routes/casesRoutes")(db);
+  const casesAdcRoutes = require("./routes/casesAdcRoutes")(db);
+  const casesNagorikRoutes = require("./routes/casesNagorikRoutes")(db);
+  const casesDivComRoutes = require("./routes/casesDivComRoutes")(db);
+  const casesAclandRoutes = require("./routes/casesAclandRoutes")(db);
+  const casesCommonRoutes = require("./routes/casesCommonRoutes")(db);
 
   const complainRoutes = require("./routes/complainRoutes")(db);
   const feedbackRoutes = require("./routes/feedbackRoutes")(db);
@@ -54,11 +59,21 @@ connectToDB().then(() => {
   const whatsappRoutes = require("./routes/whatsappRoutes")(db);
   app.use("/api", mamlaRoutes);
   app.use("/api", usersRoutes);
-  app.use("/api", divComUserRoutes);
+  // app.use("/api", divComUserRoutes);
   app.use("/api", adcMamlaRoutes);
 
   app.use("/api", casesRoutes);
-  app.use("/api", nagorikUserRoutes);
+  app.use("/api", casesDivComRoutes);
+  app.use("/api", casesNagorikRoutes);
+  app.use("/api", casesAclandRoutes);
+  app.use("/api", casesAdcRoutes);
+  app.use("/api", casesCommonRoutes);
+
+
+
+
+
+  // app.use("/api", nagorikUserRoutes);
   app.use("/api", complainRoutes);
   app.use("/api", feedbackRoutes);
   app.use("/api", smsRoutes);
