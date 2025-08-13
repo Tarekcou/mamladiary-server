@@ -10,7 +10,7 @@ function casesCommonRoutes(db) {
 
 
   router.get("/cases", async (req, res) => {
-    const { role, officeName, district, userId, isApproved, status } =
+    const { role, officeName, district, userId, isApproved,isCompleted, status } =
       req.query;
 
     const filter = {};
@@ -21,12 +21,16 @@ function casesCommonRoutes(db) {
         filter["nagorikSubmission"] = { $exists: true };
 
         if (isApproved !== undefined) {
-          filter.isApproved = isApproved === true;
+          filter.isApproved =  Boolean(isApproved);
         }
+        console.log(status)
         if (status) {
-          filter["nagorikSubmission.status"] = status;
+          filter["nagorikSubmission.status"] === "submitted";
         }
-      } else if (role === "lawyer" || role === "nagorik") {
+        if(isCompleted)
+          filter.isCompleted=Boolean(isCompleted)
+        else filter.isCompleted= false
+      } else if (role === "nagorik" ) {
         if (!userId) {
           return res
             .status(400)

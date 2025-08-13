@@ -18,7 +18,38 @@ router.patch("/cases/divcom/:id/approve", async (req, res) => {
     const query = { _id: new ObjectId(id) };
 
     const updateDoc = {
-      $set: { isApproved: true },
+      $set: { isApproved: true, isCompleted:false },
+    };
+
+    const result = await casesCollection.updateOne(query, updateDoc);
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Case not found" });
+    }
+
+    res.json({
+      message: "Case approved successfully",
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error("Error approving case:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+router.patch("/cases/divCom/:id/complete", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const approval=req.body.isCompleted
+    console.log(req.body)
+    // Validate ID
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid case ID" });
+    }
+
+    const query = { _id: new ObjectId(id) };
+
+    const updateDoc = {
+      $set: { isCompleted: approval },
     };
 
     const result = await casesCollection.updateOne(query, updateDoc);

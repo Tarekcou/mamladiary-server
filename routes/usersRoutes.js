@@ -46,7 +46,7 @@ function usersRoutes(db) {
       ...(email ? { email } : phone ? { phone: normalizedPhone } : {}),
       role: loginStatus,
     };
-    console.log(query);
+    console.log("login query",query);
 
     const user = await userCollection.findOne(query);
     console.log(user);
