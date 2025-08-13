@@ -6,12 +6,16 @@ function casesCommonRoutes(db) {
   const router = express.Router();
   const casesCollection = db.collection("cases");
 
-
-
-
   router.get("/cases", async (req, res) => {
-    const { role, officeName, district, userId, isApproved,isCompleted, status } =
-      req.query;
+    const {
+      role,
+      officeName,
+      district,
+      userId,
+      isApproved,
+      isCompleted,
+      status,
+    } = req.query;
 
     const filter = {};
 
@@ -20,17 +24,16 @@ function casesCommonRoutes(db) {
         // 🔍 Show all cases that were sent from anyone to any office
         filter["nagorikSubmission"] = { $exists: true };
 
-        if (isApproved !== undefined) {
-          filter.isApproved =  Boolean(isApproved);
-        }
-        console.log(status)
+        // if (isApproved !== undefined) {
+        //   filter.isApproved = isApproved === "true";
+        // }
+        console.log(status);
         if (status) {
-          filter["nagorikSubmission.status"] === "submitted";
+          filter["nagorikSubmission.status"] = status;
         }
-        if(isCompleted)
-          filter.isCompleted=Boolean(isCompleted)
-        else filter.isCompleted= false
-      } else if (role === "nagorik" ) {
+        if (isCompleted) filter.isCompleted = Boolean(isCompleted);
+        else filter.isCompleted = false;
+      } else if (role === "nagorik") {
         if (!userId) {
           return res
             .status(400)
@@ -68,7 +71,7 @@ function casesCommonRoutes(db) {
     }
   });
 
-   router.get("/cases/:id", async (req, res) => {
+  router.get("/cases/:id", async (req, res) => {
     try {
       const id = req.params.id;
       console.log(id);
@@ -84,7 +87,7 @@ function casesCommonRoutes(db) {
       res.status(500).send({ message: "Failed to fetch case" });
     }
   });
-    return router;
+  return router;
 }
 
 module.exports = casesCommonRoutes;
