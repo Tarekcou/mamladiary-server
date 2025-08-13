@@ -41,28 +41,25 @@ connectToDB().then(() => {
   const db = getDB(); // ✅ safe to use here
 
   // Import and use routes with db injected
-  const mamlaRoutes = require("./routes/mamlaRoutes")(db);
-  const divComUserRoutes = require("./routes/divComUserRoutes")(db);
+  const mamlaRoutes = require("./routes/others/mamlaRoutes.js")(db);
   const usersRoutes = require("./routes/usersRoutes")(db);
-  const adcMamlaRoutes = require("./routes/adcMamlaRoutes")(db);
-  const nagorikUserRoutes = require("./routes/nagorikUserRoutes")(db);
-  const casesRoutes = require("./routes/casesRoutes")(db);
-  const casesAdcRoutes = require("./routes/casesAdcRoutes")(db);
-  const casesNagorikRoutes = require("./routes/casesNagorikRoutes")(db);
-  const casesDivComRoutes = require("./routes/casesDivComRoutes")(db);
-  const casesAclandRoutes = require("./routes/casesAclandRoutes")(db);
-  const casesCommonRoutes = require("./routes/casesCommonRoutes")(db);
+  const adcMamlaRoutes = require("./routes/others/adcMamlaRoutes.js")(db);
+  const casesAdcRoutes = require("./routes/casesManagement/casesAdcRoutes.js")(db);
+  const casesNagorikRoutes = require("./routes/casesManagement/casesNagorikRoutes.js")(db);
+  const casesDivComRoutes = require("./routes/casesManagement/casesDivComRoutes.js")(db);
+  const casesAclandRoutes = require("./routes/casesManagement/casesAclandRoutes.js")(db);
+  const casesCommonRoutes = require("./routes/casesManagement/casesCommonRoutes.js")(db);
+  const smsRoutes = require("./routes/others/smsRoutes.js");
 
-  const complainRoutes = require("./routes/complainRoutes")(db);
-  const feedbackRoutes = require("./routes/feedbackRoutes")(db);
-  const smsRoutes = require("./routes/smsRoutes");
-  const whatsappRoutes = require("./routes/whatsappRoutes")(db);
+  const complainRoutes = require("./routes/others/complainRoutes.js")(db);
+  const feedbackRoutes = require("./routes/others/feedbackRoutes.js")(db);
+  // const smsRoutes = require("./routes/others/smsRoutes")(db);
+  const whatsappRoutes = require("./routes/others/whatsappRoutes.js")(db);
   app.use("/api", mamlaRoutes);
   app.use("/api", usersRoutes);
   // app.use("/api", divComUserRoutes);
   app.use("/api", adcMamlaRoutes);
 
-  app.use("/api", casesRoutes);
   app.use("/api", casesDivComRoutes);
   app.use("/api", casesNagorikRoutes);
   app.use("/api", casesAclandRoutes);

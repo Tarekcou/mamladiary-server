@@ -1,9 +1,11 @@
 // routes/smsRoutes.js
 const express = require("express");
-const { sendSMSHandler } = require("../infobip/controllers/smsController");
+const { sendSMSHandler } = require("../../infobip/controllers/smsController");
 
 const router = express.Router();
-
+function smsRoutes(db) {
 router.post("/message", sendSMSHandler); // POST /api/sms/send
 
-module.exports = router;
+return router;
+}
+module.exports = smsRoutes;

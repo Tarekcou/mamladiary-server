@@ -63,6 +63,23 @@ function casesCommonRoutes(db) {
       res.status(500).json({ message: "Server error", error: error.message });
     }
   });
+
+   router.get("/cases/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      console.log(id);
+      const caseData = await casesCollection.findOne({ _id: new ObjectId(id) });
+
+      if (!caseData) {
+        return res.status(404).send({ message: "Case not found" });
+      }
+
+      res.send(caseData);
+    } catch (error) {
+      console.error("Error fetching case:", error);
+      res.status(500).send({ message: "Failed to fetch case" });
+    }
+  });
     return router;
 }
 
