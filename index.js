@@ -44,11 +44,17 @@ connectToDB().then(() => {
   const mamlaRoutes = require("./routes/others/mamlaRoutes.js")(db);
   const usersRoutes = require("./routes/usersRoutes")(db);
   const adcMamlaRoutes = require("./routes/others/adcMamlaRoutes.js")(db);
-  const casesAdcRoutes = require("./routes/casesManagement/casesAdcRoutes.js")(db);
-  const casesNagorikRoutes = require("./routes/casesManagement/casesNagorikRoutes.js")(db);
-  const casesDivComRoutes = require("./routes/casesManagement/casesDivComRoutes.js")(db);
-  const casesAclandRoutes = require("./routes/casesManagement/casesAclandRoutes.js")(db);
-  const casesCommonRoutes = require("./routes/casesManagement/casesCommonRoutes.js")(db);
+  const casesAdcRoutes = require("./routes/casesManagement/casesAdcRoutes.js")(
+    db
+  );
+  const casesNagorikRoutes =
+    require("./routes/casesManagement/casesNagorikRoutes.js")(db);
+  const casesDivComRoutes =
+    require("./routes/casesManagement/casesDivComRoutes.js")(db);
+  const casesAclandRoutes =
+    require("./routes/casesManagement/casesAclandRoutes.js")(db);
+  const casesCommonRoutes =
+    require("./routes/casesManagement/casesCommonRoutes.js")(db);
   const smsRoutes = require("./routes/others/smsRoutes.js");
 
   const complainRoutes = require("./routes/others/complainRoutes.js")(db);
@@ -65,10 +71,6 @@ connectToDB().then(() => {
   app.use("/api", casesAclandRoutes);
   app.use("/api", casesAdcRoutes);
   app.use("/api", casesCommonRoutes);
-
-
-
-
 
   // app.use("/api", nagorikUserRoutes);
   app.use("/api", complainRoutes);

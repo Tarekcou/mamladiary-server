@@ -1,6 +1,5 @@
 // routes/whatsapp.js
 const express = require("express");
-const router = express.Router();
 const twilio = require("twilio");
 
 const accountSid = process.env.TWILIO_SID;
@@ -12,7 +11,11 @@ const client = twilio(accountSid, authToken);
 // Get all Feedback
 
 function whatsappRoutes(db) {
+  const router = express.Router();
+
   router.post("/send-whatsapp", async (req, res) => {
+    console.log("📩 /send-whatsapp route hit", req.body);
+
     const { phone, message } = req.body;
     console.log(message);
     try {
