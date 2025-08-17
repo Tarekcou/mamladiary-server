@@ -7,7 +7,7 @@ function casesNagoriRoutes(db) {
   const casesCollection = db.collection("cases");
 
   router.post("/cases/nagorik", async (req, res) => {
-    console.log("post works")
+    console.log("post works");
     try {
       const newCase = req.body;
       console.log("🔄 Posting new case from Nagorik:", newCase);
@@ -33,45 +33,40 @@ function casesNagoriRoutes(db) {
   });
 
   // PATCH — Update Nagorik submission
-router.patch("/cases/nagorik/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const payload = req.body;
-    console.log("id is",id)
-    // Prevent _id from being updated accidentally
-    delete payload._id;
+  router.patch("/cases/nagorik/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const payload = req.body;
 
-    // Find the case by ID
-    const query = { _id: new ObjectId(id) };
-    const existingCase = await casesCollection.findOne(query);
+      delete payload._id; // protect _id
 
-    if (!existingCase) {
-      return res.status(404).json({ message: "Case not found" });
-    }
+      const query = { _id: new ObjectId(id) };
 
-    // Update only nagorikSubmission fields
-    const updateDoc = {
-      $set: {
-        "nagorikSubmission": payload.nagorikSubmission,
-        isApproved: payload.isApproved ?? existingCase.isApproved,
-        updatedAt: new Date().toISOString(),
+      const existingCase = await casesCollection.findOne(query);
+      if (!existingCase) {
+        return res.status(404).json({ message: "Case not found" });
       }
-    };
-    console.log(updateDoc)
 
-    const result = await casesCollection.updateOne(query, updateDoc);
+      const updateDoc = {
+        $set: {
+          ...payload, // set everything from request
+          updatedAt: new Date().toISOString(),
+        },
+      };
 
-    res.json({
-      message: "Nagorik submission updated successfully",
-      modifiedCount: result.modifiedCount
-    });
-  } catch (error) {
-    console.error("❌ Error updating nagorik submission:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
+      const result = await casesCollection.updateOne(query, updateDoc);
 
- router.delete("/cases/nagorik/:id", async (req, res) => {
+      res.json({
+        message: "Case updated successfully",
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("❌ Error updating nagorik submission:", error);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  router.delete("/cases/nagorik/:id", async (req, res) => {
     try {
       const id = req.params.id;
       const caseId = req.body?.caseId;
@@ -90,7 +85,7 @@ router.patch("/cases/nagorik/:id", async (req, res) => {
       res.status(500).send({ message: "Failed to delete case" });
     }
   });
-router.patch("/cases/nagorik/sentTodivCom/:id", async (req, res) => {
+  router.patch("/cases/nagorik/sentTodivCom/:id", async (req, res) => {
     const { id } = req.params;
     const { stageKey, status } = req.body;
 
@@ -111,7 +106,7 @@ router.patch("/cases/nagorik/sentTodivCom/:id", async (req, res) => {
     }
   });
 
-    return router;
+  return router;
 }
 
 module.exports = casesNagoriRoutes;

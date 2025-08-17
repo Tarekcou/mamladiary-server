@@ -15,10 +15,10 @@ function casesAclandRoutes(db) {
         return res.status(400).json({ message: "Invalid case ID" });
       }
 
-      if (!Array.isArray(responsesFromOffices)) {
-        responsesFromOffices = [responsesFromOffices];
-      }
-      if (responsesFromOffices.length === 0) {
+      if (
+        !Array.isArray(responsesFromOffices) ||
+        responsesFromOffices.length === 0
+      ) {
         return res
           .status(400)
           .json({ message: "Missing responsesFromOffices data" });
@@ -29,6 +29,7 @@ function casesAclandRoutes(db) {
         return res.status(404).json({ message: "Case not found" });
       }
 
+      // Pick acLand response
       const newAclandResponse = responsesFromOffices.find(
         (r) => r.role === "acLand"
       );
@@ -36,6 +37,7 @@ function casesAclandRoutes(db) {
         return res.status(400).json({ message: "No acland response provided" });
       }
 
+      // ✅ Step 1: Merge into responsesFromOffices
       const existingIndex = caseDoc.responsesFromOffices?.findIndex(
         (r) =>
           r.role === "acLand" &&
@@ -43,28 +45,21 @@ function casesAclandRoutes(db) {
           r.district?.en === newAclandResponse.district?.en
       );
 
-      if (existingIndex === -1 || existingIndex === undefined) {
-        const result = await casesCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $push: { responsesFromOffices: newAclandResponse } }
-        );
-        return res.json({ message: "Added new acland response", ...result });
-      } else {
+      let mergedCaseEntries = [];
+      if (existingIndex > -1) {
         const existingResponse = caseDoc.responsesFromOffices[existingIndex];
         const existingCaseEntries = existingResponse.caseEntries || [];
         const newCaseEntries = newAclandResponse.caseEntries || [];
 
-        // Merge based on mamlaNo
-        let mergedCaseEntries = [...existingCaseEntries];
-
+        mergedCaseEntries = [...existingCaseEntries];
         newCaseEntries.forEach((entry) => {
           const matchIndex = mergedCaseEntries.findIndex(
             (e) => e.mamlaNo === entry.mamlaNo
           );
           if (matchIndex > -1) {
-            mergedCaseEntries[matchIndex] = entry; // update existing mamla
+            mergedCaseEntries[matchIndex] = entry; // update
           } else {
-            mergedCaseEntries.push(entry); // add new mamla
+            mergedCaseEntries.push(entry); // insert
           }
         });
 
@@ -74,18 +69,50 @@ function casesAclandRoutes(db) {
           caseEntries: mergedCaseEntries,
         };
 
-        const field = `responsesFromOffices.${existingIndex}`;
-        const result = await casesCollection.updateOne(
+        await casesCollection.updateOne(
           { _id: new ObjectId(id) },
-          { $set: { [field]: updatedResponse } }
+          {
+            $set: {
+              [`responsesFromOffices.${existingIndex}`]: updatedResponse,
+            },
+          }
         );
-
-        return res.json({
-          message: "Updated existing acland response (by mamlaNo)",
-          matchedCount: result.matchedCount,
-          modifiedCount: result.modifiedCount,
-        });
+      } else {
+        // no response found → push new
+        mergedCaseEntries = newAclandResponse.caseEntries;
+        await casesCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $push: { responsesFromOffices: newAclandResponse } }
+        );
       }
+
+      // ✅ Step 2: Also update nagorikSubmission.aclandMamlaInfo
+      if (Array.isArray(mergedCaseEntries) && mergedCaseEntries.length > 0) {
+        const mamlaNos = mergedCaseEntries.map((e) => e.mamlaNo);
+
+        await casesCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              "nagorikSubmission.aclandMamlaInfo":
+                caseDoc.nagorikSubmission.aclandMamlaInfo.map((m) =>
+                  mamlaNos.includes(m.mamlaNo)
+                    ? {
+                        ...m,
+                        sentToDivcom: true,
+                        sentToDivcomDate: new Date().toISOString(),
+                      }
+                    : m
+                ),
+            },
+          }
+        );
+      }
+
+      return res.json({
+        message: "Updated responsesFromOffices + nagorikSubmission",
+        modifiedCount: 1,
+      });
     } catch (error) {
       console.error("Error updating acland response:", error);
       res
@@ -93,6 +120,7 @@ function casesAclandRoutes(db) {
         .json({ message: "Internal server error", error: error.message });
     }
   });
+
   router.patch("/cases/acLand/:id/delete-mamla-entry", async (req, res) => {
     try {
       const { id } = req.params;

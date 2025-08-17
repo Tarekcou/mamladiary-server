@@ -46,7 +46,7 @@ function usersRoutes(db) {
       ...(email ? { email } : phone ? { phone: normalizedPhone } : {}),
       role: loginStatus,
     };
-    console.log("login query",query);
+    console.log("login query", query);
 
     const user = await userCollection.findOne(query);
     console.log(user);
@@ -76,13 +76,14 @@ function usersRoutes(db) {
   // get specific user based on role, district, officeName
   router.get("/users/specific-user", async (req, res) => {
     const { role, district, officeName } = req.query;
-
-    const filter = {};
+    console.log(req.query);
+    // const filter = {};
     if (role) filter.role = role;
     if (district) filter["district.en"] = district;
     if (officeName) filter["officeName.en"] = officeName;
 
-    const result = await userCollection.find(filter).toArray();
+    const result = await userCollection.findOne(filter);
+    // console.log(result);
     res.send(result);
   });
 
