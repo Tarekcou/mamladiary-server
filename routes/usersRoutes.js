@@ -76,14 +76,15 @@ function usersRoutes(db) {
   // get specific user based on role, district, officeName
   router.get("/users/specific-user", async (req, res) => {
     const { role, district, officeName } = req.query;
-    console.log(req.query);
-    // const filter = {};
+    console.log("1dquery", req.query);
+    const filter = {};
     if (role) filter.role = role;
     if (district) filter["district.en"] = district;
     if (officeName) filter["officeName.en"] = officeName;
+    console.log("Filter being used:", filter);
 
     const result = await userCollection.findOne(filter);
-    // console.log(result);
+    console.log(result);
     res.send(result);
   });
 

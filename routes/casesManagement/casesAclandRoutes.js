@@ -34,7 +34,7 @@ function casesAclandRoutes(db) {
         (r) => r.role === "acLand"
       );
       if (!newAclandResponse) {
-        return res.status(400).json({ message: "No acland response provided" });
+        return res.status(400).json({ message: "No acLand response provided" });
       }
 
       // ✅ Step 1: Merge into responsesFromOffices
@@ -114,7 +114,7 @@ function casesAclandRoutes(db) {
         modifiedCount: 1,
       });
     } catch (error) {
-      console.error("Error updating acland response:", error);
+      console.error("Error updating acLand response:", error);
       res
         .status(500)
         .json({ message: "Internal server error", error: error.message });
