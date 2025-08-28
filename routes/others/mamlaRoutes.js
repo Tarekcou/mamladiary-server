@@ -102,7 +102,7 @@ function mamlaRoutes(db) {
     // console.log("Updated data:", updatedData, mamlaId);
     let query;
     if (
-      updatedData.lastCondition ||
+      (!updatedData.mamlaNo && updatedData.lastCondition) ||
       updatedData.nextDate ||
       updatedData.previousDate
     )
