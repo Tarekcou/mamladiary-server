@@ -108,6 +108,7 @@ function mamlaRoutes(db) {
     )
       query = { caseId: mamlaId };
     else query = { _id: new ObjectId(mamlaId) };
+
     console.log(query);
     const updateDoc = { $set: updatedData };
     console.log(updateDoc);
