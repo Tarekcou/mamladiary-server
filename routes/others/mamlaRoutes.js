@@ -99,34 +99,48 @@ function mamlaRoutes(db) {
   router.patch("/mamla/:id", async (req, res) => {
     const mamlaId = req.params.id;
     const updatedData = req.body;
-    // console.log("Updated data:", updatedData, mamlaId);
-    let query;
-    if (
-      (!updatedData.mamlaNo && updatedData.lastCondition) ||
-      updatedData.nextDate ||
-      updatedData.previousDate
-    )
-      query = { caseId: mamlaId };
-    else query = { _id: new ObjectId(mamlaId) };
 
-    console.log(query);
-    const updateDoc = { $set: updatedData };
-    console.log(updateDoc);
+    // console.log("Updated data:", updatedData, mamlaId);
+
+    // Fields that belong to quick update
+    const summaryFields = ["lastCondition", "nextDate", "previousDate"];
+
+    // Check if request body ONLY has these summary fields
+    const isSummaryUpdate = Object.keys(updatedData).every((key) =>
+      summaryFields.includes(key)
+    );
+
+    // Decide query based on type of update
+    let query;
+    if (isSummaryUpdate) {
+      // Quick update → match by caseId
+      query = { caseId: mamlaId };
+    } else {
+      // Full update → match by _id
+      query = { _id: new ObjectId(mamlaId) };
+    }
+
+    // Build update doc
+    const updateDoc = { $set: {} };
+    for (const key in updatedData) {
+      if (updatedData[key] !== undefined) {
+        updateDoc.$set[key] = updatedData[key];
+      }
+    }
+
     try {
       const result = await casesCollection.updateOne(query, updateDoc);
-      console.log(result);
       if (result.matchedCount === 0) {
-        return res
-          .status(404)
-          .send({ error: "No case found with this caseId" });
+        return res.status(404).json({ error: "No case found to update" });
       }
 
-      res.send({ message: "Case updated successfully", result });
+      res.json({ message: "Case updated successfully", result });
     } catch (error) {
       console.error("❌ Failed to update case:", error.message);
-      res.status(500).send({ error: "Failed to update case" });
+      res.status(500).json({ error: "Failed to update case" });
     }
   });
+
   router.delete("/mamla/:id", async (req, res) => {
     const mamlaId = req.params.id;
     console.log("Deleting mamla with ID:", mamlaId);
