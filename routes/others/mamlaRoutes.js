@@ -11,27 +11,31 @@ function mamlaRoutes(db) {
 
   // Search mamla by query parameters
   router.get("/mamlas", async (req, res) => {
-    const { mamlaNo, district, mamlaName, year } = req.query;
-    // Combine all into a single filter object
-
-    const query = {
-      mamlaNo,
-      year,
-      district,
-      mamlaName,
-    };
-    // console.log(query)
     try {
-      const caseDoc = await casesCollection.findOne(query);
-      // console.log(caseDoc);
-      // console.log("Found case:", caseDoc);
-      res.send(caseDoc);
+      const { mamlaNo, district, mamlaName, year } = req.query;
+
+      // Build query dynamically
+      const query = {};
+      if (mamlaNo) query.mamlaNo = mamlaNo;
+      if (year) query.year = year;
+
+      // ✅ Fix: use nested path for district.en
+      if (district) query["district.en"] = district;
+
+      if (mamlaName) {
+        query.mamlaName = { $regex: mamlaName, $options: "i" };
+      }
+
+      console.log(query);
+
+      const mamlas = await casesCollection.findOne(query);
+      res.status(200).json(mamlas);
     } catch (error) {
-      console.error("Error finding case:", error);
-      // res.status(500).send({ error: "Internal server error" });
-      res.send(error);
+      console.error("Error fetching mamlas:", error);
+      res.status(500).json({ message: "Failed to fetch mamlas" });
     }
   });
+
   router.get("/allMamla", async (req, res) => {
     try {
       const result = await casesCollection.find().sort({ _id: -1 }).toArray();
